@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Sports League Management System - Kubernetes Deployment Script
-# This script deploys the application to a local Kind cluster using Helm
+# Open League Management System - Kubernetes Deployment Script
+# This script deploys the open-source league management application to a local Kind cluster using Helm
 
 set -e
 
@@ -13,12 +13,12 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-CLUSTER_NAME="sports-league"
+CLUSTER_NAME="open-league"
 NAMESPACE="default"
-CHART_PATH="./k8s/helm-charts/sports-league"
-RELEASE_NAME="sports-league"
+CHART_PATH="./k8s/helm-charts/open-league"
+RELEASE_NAME="open-league"
 
-echo -e "${BLUE}🏈 Sports League Management System - Kubernetes Deployment${NC}"
+echo -e "${BLUE}🏆 Open League Management System - Kubernetes Deployment${NC}"
 echo "================================================================"
 
 # Function to print status
@@ -77,13 +77,13 @@ build_images() {
     
     # Build backend image
     echo "Building backend image..."
-    docker build -t sports-league-backend:latest ./backend
-    kind load docker-image sports-league-backend:latest --name "$CLUSTER_NAME"
+    docker build -t open-league-backend:latest ./backend
+    kind load docker-image open-league-backend:latest --name "$CLUSTER_NAME"
     
     # Build frontend image
     echo "Building frontend image..."
-    docker build -t sports-league-frontend:latest ./frontend
-    kind load docker-image sports-league-frontend:latest --name "$CLUSTER_NAME"
+    docker build -t open-league-frontend:latest ./frontend
+    kind load docker-image open-league-frontend:latest --name "$CLUSTER_NAME"
     
     print_status "Docker images built and loaded into cluster"
 }
@@ -124,9 +124,9 @@ deploy_with_helm() {
 wait_for_deployments() {
     echo -e "${BLUE}Waiting for deployments to be ready...${NC}"
     
-    kubectl wait --for=condition=available --timeout=300s deployment/sports-league-backend
-    kubectl wait --for=condition=available --timeout=300s deployment/sports-league-frontend
-    kubectl wait --for=condition=available --timeout=300s deployment/sports-league-mongodb
+    kubectl wait --for=condition=available --timeout=300s deployment/open-league-backend
+    kubectl wait --for=condition=available --timeout=300s deployment/open-league-frontend
+    kubectl wait --for=condition=available --timeout=300s deployment/open-league-mongodb
     
     print_status "All deployments are ready"
 }
@@ -137,21 +137,21 @@ show_status() {
     echo "=================="
     
     echo -e "\n${YELLOW}Pods:${NC}"
-    kubectl get pods -l app.kubernetes.io/name=sports-league
+    kubectl get pods -l app.kubernetes.io/name=open-league
     
     echo -e "\n${YELLOW}Services:${NC}"
-    kubectl get services -l app.kubernetes.io/name=sports-league
+    kubectl get services -l app.kubernetes.io/name=open-league
     
     echo -e "\n${YELLOW}Ingress:${NC}"
     kubectl get ingress
     
     echo -e "\n${GREEN}🎉 Deployment completed successfully!${NC}"
     echo -e "\n${BLUE}Access the application:${NC}"
-    echo "Frontend: http://sports-league.local"
-    echo "Backend API: http://sports-league.local/api"
+    echo "Frontend: http://open-league.local"
+    echo "Backend API: http://open-league.local/api"
     echo ""
-    echo -e "${YELLOW}Note: Add '127.0.0.1 sports-league.local' to your /etc/hosts file${NC}"
-    echo "Or use: curl -H 'Host: sports-league.local' http://localhost"
+    echo -e "${YELLOW}Note: Add '127.0.0.1 open-league.local' to your /etc/hosts file${NC}"
+    echo "Or use: curl -H 'Host: open-league.local' http://localhost"
 }
 
 # Cleanup function

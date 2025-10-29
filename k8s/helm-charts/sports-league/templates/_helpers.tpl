@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "sports-league.name" -}}
+{{- define "open-league.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "sports-league.fullname" -}}
+{{- define "open-league.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "sports-league.chart" -}}
+{{- define "open-league.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "sports-league.labels" -}}
-helm.sh/chart: {{ include "sports-league.chart" . }}
-{{ include "sports-league.selectorLabels" . }}
+{{- define "open-league.labels" -}}
+helm.sh/chart: {{ include "open-league.chart" . }}
+{{ include "open-league.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,17 +45,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "sports-league.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "sports-league.name" . }}
+{{- define "open-league.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "open-league.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "sports-league.serviceAccountName" -}}
+{{- define "open-league.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "sports-league.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "open-league.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}

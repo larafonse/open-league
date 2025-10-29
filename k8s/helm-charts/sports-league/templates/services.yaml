@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "sports-league.fullname" . }}-backend
+  name: {{ include "open-league.fullname" . }}-backend
   labels:
-    {{- include "sports-league.labels" . | nindent 4 }}
+    {{- include "open-league.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -12,15 +12,15 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "sports-league.selectorLabels" . | nindent 4 }}
+    {{- include "open-league.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: backend
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "sports-league.fullname" . }}-frontend
+  name: {{ include "open-league.fullname" . }}-frontend
   labels:
-    {{- include "sports-league.labels" . | nindent 4 }}
+    {{- include "open-league.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -29,5 +29,5 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "sports-league.selectorLabels" . | nindent 4 }}
+    {{- include "open-league.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: frontend

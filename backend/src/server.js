@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/sports-league', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/open-league', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })

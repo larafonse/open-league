@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "sports-league.fullname" . }}-backend
+  name: {{ include "open-league.fullname" . }}-backend
   labels:
-    {{- include "sports-league.labels" . | nindent 4 }}
+    {{- include "open-league.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "sports-league.selectorLabels" . | nindent 6 }}
+      {{- include "open-league.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: backend
   template:
     metadata:
@@ -19,14 +19,14 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "sports-league.selectorLabels" . | nindent 8 }}
+        {{- include "open-league.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: backend
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "sports-league.serviceAccountName" . }}
+      serviceAccountName: {{ include "open-league.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -41,7 +41,7 @@ spec:
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: {{ include "sports-league.fullname" . }}-backend-config
+                name: {{ include "open-league.fullname" . }}-backend-config
           livenessProbe:
             httpGet:
               path: /api/health

@@ -1,7 +1,7 @@
 {
-  "name": "sports-league-manager",
+  "name": "open-league-manager",
   "version": "1.0.0",
-  "description": "A comprehensive sports league management web application",
+  "description": "An open-source league management web application",
   "main": "index.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
@@ -12,7 +12,7 @@
     "build:frontend": "cd frontend && npm run build",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
   },
-  "keywords": ["sports", "league", "management", "nodejs", "react"],
+  "keywords": ["open-source", "league", "management", "nodejs", "react", "sports"],
   "author": "Nicolas Lara",
   "license": "MIT",
   "devDependencies": {

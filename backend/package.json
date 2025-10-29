@@ -1,7 +1,7 @@
 {
-  "name": "sports-league-backend",
+  "name": "open-league-backend",
   "version": "1.0.0",
-  "description": "Backend API for sports league management",
+  "description": "Backend API for open-source league management",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
@@ -22,7 +22,7 @@
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
-  "keywords": ["express", "api", "sports", "league"],
+  "keywords": ["express", "api", "open-source", "league"],
   "author": "Nicolas Lara",
   "license": "MIT"
 }

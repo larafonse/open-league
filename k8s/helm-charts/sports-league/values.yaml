@@ -1,8 +1,8 @@
-# Default values for sports-league
+# Default values for open-league
 replicaCount: 2
 
 image:
-  repository: "sports-league-"
+  repository: "open-league-"
   pullPolicy: IfNotPresent
   tag: "latest"
 
@@ -32,7 +32,7 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
   hosts:
-    - host: sports-league.local
+    - host: open-league.local
       paths:
         - path: /
           pathType: Prefix

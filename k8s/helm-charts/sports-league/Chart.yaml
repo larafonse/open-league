@@ -1,5 +1,5 @@
 apiVersion: v2
-name: sports-league
+name: open-league
 description: A Helm chart for Sports League Management System
 type: application
 version: 0.1.0
@@ -10,9 +10,9 @@ keywords:
   - management
   - nodejs
   - react
-home: https://github.com/your-org/sports-league
+home: https://github.com/your-org/open-league
 sources:
-  - https://github.com/your-org/sports-league
+  - https://github.com/your-org/open-league
 maintainers:
   - name: Your Name
     email: your.email@example.com

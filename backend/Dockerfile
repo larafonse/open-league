@@ -1,4 +1,4 @@
-# Backend Dockerfile
+# Open League Backend Dockerfile
 FROM node:18-alpine
 
 WORKDIR /app

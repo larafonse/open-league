@@ -57,7 +57,7 @@ A comprehensive web application for managing sports leagues, built with Node.js,
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd sports-league-manager
+   cd open-league-manager
    ```
 
 2. **Install dependencies**
@@ -79,7 +79,7 @@ A comprehensive web application for managing sports leagues, built with Node.js,
    ```env
    PORT=3001
    NODE_ENV=development
-   MONGODB_URI=mongodb://localhost:27017/sports-league
+   MONGODB_URI=mongodb://localhost:27017/open-league
    JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
    JWT_EXPIRE=7d
    ```
@@ -97,7 +97,7 @@ A comprehensive web application for managing sports leagues, built with Node.js,
 ## Project Structure
 
 ```
-sports-league-manager/
+open-league-manager/
 ├── backend/
 │   ├── src/
 │   │   ├── models/          # Database models
