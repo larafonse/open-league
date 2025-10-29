@@ -46,7 +46,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="flex items-center justify-center h-16 px-4 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-gray-900">Sports League</h1>
+          <h1 className="text-xl font-bold text-gray-900">Open League</h1>
         </div>
         
         <nav className="mt-8 px-4">

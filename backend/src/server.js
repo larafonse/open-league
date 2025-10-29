@@ -28,7 +28,7 @@ app.use('/api/standings', require('./routes/standings'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Sports League API is running' });
+  res.json({ status: 'OK', message: 'Open League API is running' });
 });
 
 // Error handling middleware
