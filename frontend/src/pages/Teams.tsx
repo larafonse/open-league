@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
   Container,
   Dialog,
@@ -15,7 +13,15 @@ import {
   TextField,
   Typography,
   Avatar,
-  Paper,Grid } from '@mui/material';
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip
+} from '@mui/material';
 import {
   Add,
   People,
@@ -128,8 +134,8 @@ const Teams: React.FC = () => {
         <DialogTitle>Create New Team</DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
-            <Grid container spacing={2}>
-              <Grid xs={12} sm={6}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Team Name"
@@ -137,8 +143,8 @@ const Teams: React.FC = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="City"
@@ -146,8 +152,8 @@ const Teams: React.FC = () => {
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Founded Year"
@@ -155,16 +161,16 @@ const Teams: React.FC = () => {
                   value={formData.founded}
                   onChange={(e) => setFormData({ ...formData, founded: e.target.value })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Coach"
                   value={formData.coach}
                   onChange={(e) => setFormData({ ...formData, coach: e.target.value })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Primary Color"
@@ -175,8 +181,8 @@ const Teams: React.FC = () => {
                     colors: { ...formData.colors, primary: e.target.value }
                   })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Secondary Color"
@@ -187,8 +193,8 @@ const Teams: React.FC = () => {
                     colors: { ...formData.colors, secondary: e.target.value }
                   })}
                 />
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setShowCreateForm(false)}>
@@ -201,39 +207,70 @@ const Teams: React.FC = () => {
         </form>
       </Dialog>
 
-      {/* Teams Grid */}
+      {/* Teams Table */}
       {teams.length > 0 ? (
-        <Grid container spacing={3}>
-          {teams.map((team) => (
-            <Grid xs={12} sm={6} md={4} key={team._id}>
-              <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Team</TableCell>
+                <TableCell>City</TableCell>
+                <TableCell>Coach</TableCell>
+                <TableCell>Founded</TableCell>
+                <TableCell>Record</TableCell>
+                <TableCell>Win %</TableCell>
+                <TableCell>Players</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {teams.map((team) => (
+                <TableRow key={team._id} hover>
+                  <TableCell>
                     <Box display="flex" alignItems="center">
                       <Avatar
                         sx={{
                           bgcolor: team.colors.primary,
                           color: team.colors.secondary,
                           mr: 2,
-                          width: 48,
-                          height: 48,
+                          width: 40,
+                          height: 40,
                         }}
                       >
                         {team.name.charAt(0)}
                       </Avatar>
-                      <Box>
-                        <Typography variant="h6" component="h3">
-                          {team.name}
-                        </Typography>
-                        <Box display="flex" alignItems="center">
-                          <LocationOn fontSize="small" color="action" sx={{ mr: 0.5 }} />
-                          <Typography variant="body2" color="textSecondary">
-                            {team.city}
-                          </Typography>
-                        </Box>
-                      </Box>
+                      <Typography variant="subtitle1" fontWeight="medium">
+                        {team.name}
+                      </Typography>
                     </Box>
-                    <Box>
+                  </TableCell>
+                  <TableCell>
+                    <Box display="flex" alignItems="center">
+                      <LocationOn fontSize="small" color="action" sx={{ mr: 0.5 }} />
+                      {team.city}
+                    </Box>
+                  </TableCell>
+                  <TableCell>{team.coach || '-'}</TableCell>
+                  <TableCell>{team.founded || '-'}</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={`${team.wins}-${team.losses}-${team.ties}`} 
+                      size="small" 
+                      color="primary" 
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight="medium">
+                      {(team.winPercentage * 100).toFixed(1)}%
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {team.players.length}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Box display="flex" gap={1}>
                       <IconButton
                         component={Link}
                         to={`/teams/${team._id}`}
@@ -250,69 +287,12 @@ const Teams: React.FC = () => {
                         <Delete />
                       </IconButton>
                     </Box>
-                  </Box>
-
-                  <Box mb={2}>
-                    <Box display="flex" justifyContent="space-between" mb={1}>
-                      <Typography variant="body2" color="textSecondary">
-                        Players
-                      </Typography>
-                      <Typography variant="body2" fontWeight="medium">
-                        {team.players.length}
-                      </Typography>
-                    </Box>
-                    <Box display="flex" justifyContent="space-between" mb={1}>
-                      <Typography variant="body2" color="textSecondary">
-                        Record
-                      </Typography>
-                      <Typography variant="body2" fontWeight="medium">
-                        {team.wins}-{team.losses}-{team.ties}
-                      </Typography>
-                    </Box>
-                    <Box display="flex" justifyContent="space-between" mb={1}>
-                      <Typography variant="body2" color="textSecondary">
-                        Win %
-                      </Typography>
-                      <Typography variant="body2" fontWeight="medium">
-                        {(team.winPercentage * 100).toFixed(1)}%
-                      </Typography>
-                    </Box>
-                    {team.coach && (
-                      <Box display="flex" justifyContent="space-between" mb={1}>
-                        <Typography variant="body2" color="textSecondary">
-                          Coach
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium">
-                          {team.coach}
-                        </Typography>
-                      </Box>
-                    )}
-                    {team.founded && (
-                      <Box display="flex" justifyContent="space-between">
-                        <Typography variant="body2" color="textSecondary">
-                          Founded
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium">
-                          {team.founded}
-                        </Typography>
-                      </Box>
-                    )}
-                  </Box>
-                </CardContent>
-                <Box p={2} pt={0}>
-                  <Button
-                    component={Link}
-                    to={`/teams/${team._id}`}
-                    variant="contained"
-                    fullWidth
-                  >
-                    View Details
-                  </Button>
-                </Box>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
       ) : (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <People sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />

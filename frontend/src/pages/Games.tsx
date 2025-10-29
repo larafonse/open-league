@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
   Container,
   Dialog,
@@ -20,7 +18,13 @@ import {
   Typography,
   Chip,
   Paper,
-  Grid } from '@mui/material';
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
+} from '@mui/material';
 import {
   Add,
   CalendarToday,
@@ -161,8 +165,8 @@ const Games: React.FC = () => {
         <DialogTitle>Schedule New Game</DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
-            <Grid container spacing={2}>
-              <Grid xs={12} sm={6}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <FormControl fullWidth required>
                   <InputLabel>Home Team</InputLabel>
                   <Select
@@ -175,8 +179,8 @@ const Games: React.FC = () => {
                     ))}
                   </Select>
                 </FormControl>
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <FormControl fullWidth required>
                   <InputLabel>Away Team</InputLabel>
                   <Select
@@ -189,8 +193,8 @@ const Games: React.FC = () => {
                     ))}
                   </Select>
                 </FormControl>
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Scheduled Date & Time"
@@ -200,8 +204,8 @@ const Games: React.FC = () => {
                   value={formData.scheduledDate}
                   onChange={(e) => setFormData({ ...formData, scheduledDate: e.target.value })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Venue Name"
@@ -212,8 +216,8 @@ const Games: React.FC = () => {
                     venue: { ...formData.venue, name: e.target.value }
                   })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Venue Address"
@@ -223,8 +227,8 @@ const Games: React.FC = () => {
                     venue: { ...formData.venue, address: e.target.value }
                   })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Venue Capacity"
@@ -235,8 +239,8 @@ const Games: React.FC = () => {
                     venue: { ...formData.venue, capacity: e.target.value }
                   })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Referee Name"
@@ -246,8 +250,8 @@ const Games: React.FC = () => {
                     referee: { ...formData.referee, name: e.target.value }
                   })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Referee Phone"
@@ -258,8 +262,8 @@ const Games: React.FC = () => {
                     referee: { ...formData.referee, phone: e.target.value }
                   })}
                 />
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setShowCreateForm(false)}>
@@ -272,28 +276,33 @@ const Games: React.FC = () => {
         </form>
       </Dialog>
 
-      {/* Games List */}
+      {/* Games Table */}
       {games.length > 0 ? (
-        <Box>
-          {games.map((game) => (
-            <Card key={game._id} sx={{ mb: 2 }}>
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                  <Box flex={1}>
-                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                      <Typography variant="h6" component="h3">
-                        {game.homeTeam.name} vs {game.awayTeam.name}
-                      </Typography>
-                      <Chip 
-                        label={game.status.replace('_', ' ')} 
-                        color={getStatusColor(game.status) as any}
-                        size="small"
-                      />
-                    </Box>
-                    <Box display="flex" alignItems="center" gap={3} mb={1}>
-                      <Box display="flex" alignItems="center">
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Match</TableCell>
+                <TableCell>Date & Time</TableCell>
+                <TableCell>Venue</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Score</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {games.map((game) => (
+                <TableRow key={game._id} hover>
+                  <TableCell>
+                    <Typography variant="subtitle1" fontWeight="medium">
+                      {game.homeTeam.name} vs {game.awayTeam.name}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Box>
+                      <Box display="flex" alignItems="center" mb={0.5}>
                         <CalendarToday fontSize="small" color="action" sx={{ mr: 0.5 }} />
-                        <Typography variant="body2" color="textSecondary">
+                        <Typography variant="body2">
                           {new Date(game.scheduledDate).toLocaleDateString()}
                         </Typography>
                       </Box>
@@ -303,41 +312,58 @@ const Games: React.FC = () => {
                           {new Date(game.scheduledDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </Typography>
                       </Box>
-                      <Box display="flex" alignItems="center">
-                        <LocationOn fontSize="small" color="action" sx={{ mr: 0.5 }} />
-                        <Typography variant="body2" color="textSecondary">
-                          {game.venue.name}
-                        </Typography>
-                      </Box>
                     </Box>
-                    {game.status === 'completed' && (
-                      <Typography variant="h6" color="primary" fontWeight="bold">
+                  </TableCell>
+                  <TableCell>
+                    <Box display="flex" alignItems="center">
+                      <LocationOn fontSize="small" color="action" sx={{ mr: 0.5 }} />
+                      <Typography variant="body2">
+                        {game.venue.name}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={game.status.replace('_', ' ')} 
+                      color={getStatusColor(game.status) as any}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {game.status === 'completed' ? (
+                      <Typography variant="body1" fontWeight="bold" color="primary">
                         {game.score.homeTeam} - {game.score.awayTeam}
                       </Typography>
+                    ) : (
+                      <Typography variant="body2" color="textSecondary">
+                        -
+                      </Typography>
                     )}
-                  </Box>
-                  <Box>
-                    <IconButton
-                      component={Link}
-                      to={`/games/${game._id}`}
-                      size="small"
-                      color="primary"
-                    >
-                      <Edit />
-                    </IconButton>
-                    <IconButton
-                      onClick={() => handleDelete(game._id)}
-                      size="small"
-                      color="error"
-                    >
-                      <Delete />
-                    </IconButton>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          ))}
-        </Box>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Box display="flex" gap={1}>
+                      <IconButton
+                        component={Link}
+                        to={`/games/${game._id}`}
+                        size="small"
+                        color="primary"
+                      >
+                        <Edit />
+                      </IconButton>
+                      <IconButton
+                        onClick={() => handleDelete(game._id)}
+                        size="small"
+                        color="error"
+                      >
+                        <Delete />
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
       ) : (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <CalendarToday sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />

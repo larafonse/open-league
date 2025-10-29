@@ -233,53 +233,54 @@ const Dashboard: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-      </Grid>
-
-      {/* Upcoming Games */}
-      <Card sx={{ mt: 3 }}>
-        <CardContent>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6" component="h2">
-              Upcoming Games
-            </Typography>
-            <Link to="/games" style={{ textDecoration: 'none' }}>
-              <Typography variant="body2" color="primary">
-                View All
-              </Typography>
-            </Link>
-          </Box>
-          <List>
-            {upcomingGames.length > 0 ? (
-              upcomingGames.map((game, index) => (
-                <React.Fragment key={game._id}>
+        {/* Upcoming Games */}
+        <Grid xs={12} lg={6}>
+          <Card>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6" component="h2">
+                  Upcoming Games
+                </Typography>
+                <Link to="/games" style={{ textDecoration: 'none' }}>
+                  <Typography variant="body2" color="primary">
+                    View All
+                  </Typography>
+                </Link>
+              </Box>
+              <List>
+                {upcomingGames.length > 0 ? (
+                  upcomingGames.map((game, index) => (
+                    <React.Fragment key={game._id}>
+                      <ListItem>
+                        <ListItemText
+                          primary={`${game.homeTeam.name} vs ${game.awayTeam.name}`}
+                          secondary={new Date(game.actualDate || game.scheduledDate).toLocaleDateString()}
+                        />
+                        <ListItemSecondaryAction>
+                          <Box textAlign="right">
+                            <Typography variant="body2" fontWeight="bold">
+                              {game.score.homeTeam} - {game.score.awayTeam}
+                            </Typography>
+                            <Chip label={game.status} size="small" color="primary" />
+                          </Box>
+                        </ListItemSecondaryAction>
+                      </ListItem>
+                      {index < upcomingGames.length - 1 && <Divider />}
+                    </React.Fragment>
+                  ))
+                ) : (
                   <ListItem>
                     <ListItemText
-                      primary={`${game.homeTeam.name} vs ${game.awayTeam.name}`}
-                      secondary={`${game.venue.name} • ${new Date(game.scheduledDate).toLocaleDateString()}`}
+                      primary="No upcoming games"
+                      sx={{ textAlign: 'center' }}
                     />
-                    <ListItemSecondaryAction>
-                      <Box textAlign="right">
-                        <Typography variant="body2" color="textSecondary">
-                          {new Date(game.scheduledDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Typography>
-                        <Chip label={game.status} size="small" color="primary" />
-                      </Box>
-                    </ListItemSecondaryAction>
                   </ListItem>
-                  {index < upcomingGames.length - 1 && <Divider />}
-                </React.Fragment>
-              ))
-            ) : (
-              <ListItem>
-                <ListItemText
-                  primary="No upcoming games"
-                  sx={{ textAlign: 'center' }}
-                />
-              </ListItem>
-            )}
-          </List>
-        </CardContent>
-      </Card>
+                )}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
     </Container>
   );
 };

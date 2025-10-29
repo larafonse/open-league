@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
   Container,
   Dialog,
@@ -20,7 +18,14 @@ import {
   Typography,
   Avatar,
   Chip,
-  Paper,Grid } from '@mui/material';
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
+} from '@mui/material';
 import {
   Add,
   Person,
@@ -133,8 +138,8 @@ const Players: React.FC = () => {
         <DialogTitle>Register New Player</DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
-            <Grid container spacing={2}>
-              <Grid xs={12} sm={6}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="First Name"
@@ -142,8 +147,8 @@ const Players: React.FC = () => {
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Last Name"
@@ -151,8 +156,8 @@ const Players: React.FC = () => {
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Email"
@@ -161,8 +166,8 @@ const Players: React.FC = () => {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Phone"
@@ -170,8 +175,8 @@ const Players: React.FC = () => {
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Date of Birth"
@@ -181,8 +186,8 @@ const Players: React.FC = () => {
                   value={formData.dateOfBirth}
                   onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <FormControl fullWidth required>
                   <InputLabel>Position</InputLabel>
                   <Select
@@ -198,8 +203,8 @@ const Players: React.FC = () => {
                     <MenuItem value="Manager">Manager</MenuItem>
                   </Select>
                 </FormControl>
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                 <TextField
                   fullWidth
                   label="Jersey Number"
@@ -208,8 +213,8 @@ const Players: React.FC = () => {
                   value={formData.jerseyNumber}
                   onChange={(e) => setFormData({ ...formData, jerseyNumber: e.target.value })}
                 />
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setShowCreateForm(false)}>
@@ -222,26 +227,86 @@ const Players: React.FC = () => {
         </form>
       </Dialog>
 
-      {/* Players Grid */}
+      {/* Players Table */}
       {players.length > 0 ? (
-        <Grid container spacing={3}>
-          {players.map((player) => (
-            <Grid xs={12} sm={6} md={4} key={player._id}>
-              <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Player</TableCell>
+                <TableCell>Position</TableCell>
+                <TableCell>Jersey #</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Phone</TableCell>
+                <TableCell>Age</TableCell>
+                <TableCell>Team</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {players.map((player) => (
+                <TableRow key={player._id} hover>
+                  <TableCell>
                     <Box display="flex" alignItems="center">
-                      <Avatar sx={{ bgcolor: 'primary.main', mr: 2, width: 48, height: 48 }}>
+                      <Avatar sx={{ bgcolor: 'primary.main', mr: 2, width: 40, height: 40 }}>
                         <Person />
                       </Avatar>
-                      <Box>
-                        <Typography variant="h6" component="h3">
-                          {player.fullName}
-                        </Typography>
-                        <Chip label={player.position} size="small" color="primary" />
-                      </Box>
+                      <Typography variant="subtitle1" fontWeight="medium">
+                        {player.fullName}
+                      </Typography>
                     </Box>
-                    <Box>
+                  </TableCell>
+                  <TableCell>
+                    <Chip label={player.position} size="small" color="primary" />
+                  </TableCell>
+                  <TableCell>
+                    {player.jerseyNumber ? (
+                      <Typography variant="body2" fontWeight="medium">
+                        #{player.jerseyNumber}
+                      </Typography>
+                    ) : (
+                      '-'
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Box display="flex" alignItems="center">
+                      <Email fontSize="small" color="action" sx={{ mr: 0.5 }} />
+                      <Typography variant="body2">
+                        {player.email}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    {player.phone ? (
+                      <Box display="flex" alignItems="center">
+                        <Phone fontSize="small" color="action" sx={{ mr: 0.5 }} />
+                        <Typography variant="body2">
+                          {player.phone}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      '-'
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Box display="flex" alignItems="center">
+                      <CalendarToday fontSize="small" color="action" sx={{ mr: 0.5 }} />
+                      <Typography variant="body2">
+                        {player.age}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    {player.team ? (
+                      <Typography variant="body2" fontWeight="medium">
+                        {player.team.name}
+                      </Typography>
+                    ) : (
+                      '-'
+                    )}
+                  </TableCell>
+                  <TableCell align="right">
+                    <Box display="flex" gap={1}>
                       <IconButton
                         component={Link}
                         to={`/players/${player._id}`}
@@ -258,65 +323,12 @@ const Players: React.FC = () => {
                         <Delete />
                       </IconButton>
                     </Box>
-                  </Box>
-
-                  <Box mb={2}>
-                    <Box display="flex" alignItems="center" mb={1}>
-                      <Email fontSize="small" color="action" sx={{ mr: 1 }} />
-                      <Typography variant="body2" color="textSecondary">
-                        {player.email}
-                      </Typography>
-                    </Box>
-                    {player.phone && (
-                      <Box display="flex" alignItems="center" mb={1}>
-                        <Phone fontSize="small" color="action" sx={{ mr: 1 }} />
-                        <Typography variant="body2" color="textSecondary">
-                          {player.phone}
-                        </Typography>
-                      </Box>
-                    )}
-                    <Box display="flex" alignItems="center" mb={1}>
-                      <CalendarToday fontSize="small" color="action" sx={{ mr: 1 }} />
-                      <Typography variant="body2" color="textSecondary">
-                        Age {player.age}
-                      </Typography>
-                    </Box>
-                    {player.jerseyNumber && (
-                      <Box display="flex" justifyContent="space-between" mb={1}>
-                        <Typography variant="body2" color="textSecondary">
-                          Jersey #
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium">
-                          {player.jerseyNumber}
-                        </Typography>
-                      </Box>
-                    )}
-                    {player.team && (
-                      <Box display="flex" justifyContent="space-between">
-                        <Typography variant="body2" color="textSecondary">
-                          Team
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium">
-                          {player.team.name}
-                        </Typography>
-                      </Box>
-                    )}
-                  </Box>
-                </CardContent>
-                <Box p={2} pt={0}>
-                  <Button
-                    component={Link}
-                    to={`/players/${player._id}`}
-                    variant="contained"
-                    fullWidth
-                  >
-                    View Details
-                  </Button>
-                </Box>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
       ) : (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <Person sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />

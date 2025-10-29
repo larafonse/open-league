@@ -83,7 +83,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <Box sx={{ display: 'flex' }}>
-      <AppBar
+      {/* <AppBar
         position="fixed"
         sx={{
           width: { lg: `calc(100% - ${240}px)` },
@@ -104,7 +104,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             Open League Management
           </Typography>
         </Toolbar>
-      </AppBar>
+      </AppBar> */}
 
       <Box
         component="nav"
@@ -144,7 +144,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           width: { lg: `calc(100% - ${240}px)` },
         }}
       >
-        <Toolbar />
         {children}
       </Box>
     </Box>

@@ -74,9 +74,6 @@ const Standings: React.FC = () => {
         <Typography variant="h3" component="h1" gutterBottom>
           League Standings
         </Typography>
-        <Typography variant="body1" color="textSecondary">
-          Current league standings and statistics
-        </Typography>
       </Box>
 
       {standings.length > 0 ? (
