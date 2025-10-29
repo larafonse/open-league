@@ -1,20 +1,35 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
+import {
+  Box,
+  Card,
+  CardContent,
+  Container,
+  Typography,
+} from '@mui/material';
 
 const PlayerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Player Details</h1>
-        <p className="mt-2 text-gray-600">Player ID: {id}</p>
-      </div>
+    <Container maxWidth="xl">
+      <Box mb={4}>
+        <Typography variant="h3" component="h1" gutterBottom>
+          Player Details
+        </Typography>
+        <Typography variant="body1" color="textSecondary">
+          Player ID: {id}
+        </Typography>
+      </Box>
       
-      <div className="card">
-        <p className="text-gray-600">Player detail page coming soon...</p>
-      </div>
-    </div>
+      <Card>
+        <CardContent>
+          <Typography variant="body1" color="textSecondary">
+            Player detail page coming soon...
+          </Typography>
+        </CardContent>
+      </Card>
+    </Container>
   );
 };
 

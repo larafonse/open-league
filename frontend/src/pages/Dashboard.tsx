@@ -1,6 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, User, Calendar, Trophy } from 'lucide-react';
+import {
+  Box,
+  Card,
+  CardContent,
+  CircularProgress,
+  Container,
+  Typography,
+  Chip,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Avatar,
+  Divider,Grid } from '@mui/material';
+import {
+  People,
+  Person,
+  CalendarToday,
+  EmojiEvents,
+} from '@mui/icons-material';
 import { teamsApi, playersApi, gamesApi, standingsApi } from '../services/api';
 import type { Team, Player, Game, Standing } from '../types';
 
@@ -49,177 +68,219 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
     );
   }
 
+  const StatCard = ({ title, value, icon, color }: { title: string; value: number; icon: React.ReactNode; color: string }) => (
+    <Card>
+      <CardContent>
+        <Box display="flex" alignItems="center">
+          <Avatar sx={{ bgcolor: color, mr: 2 }}>
+            {icon}
+          </Avatar>
+          <Box>
+            <Typography color="textSecondary" gutterBottom variant="body2">
+              {title}
+            </Typography>
+            <Typography variant="h4" component="div">
+              {value}
+            </Typography>
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-2 text-gray-600">Welcome to your sports league management system</p>
-      </div>
+    <Container maxWidth="xl">
+      <Box mb={4}>
+        <Typography variant="h3" component="h1" gutterBottom>
+          Dashboard
+        </Typography>
+        <Typography variant="body1" color="textSecondary">
+          Welcome to your sports league management system
+        </Typography>
+      </Box>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="card">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-primary-100">
-              <Users className="h-6 w-6 text-primary-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Teams</p>
-              <p className="text-2xl font-semibold text-gray-900">{teams.length}</p>
-            </div>
-          </div>
-        </div>
+      <Grid container spacing={3} mb={4}>
+        <Grid xs={12} sm={6} md={3}>
+          <StatCard
+            title="Total Teams"
+            value={teams.length}
+            icon={<People />}
+            color="primary.main"
+          />
+        </Grid>
+        <Grid xs={12} sm={6} md={3}>
+          <StatCard
+            title="Total Players"
+            value={players.length}
+            icon={<Person />}
+            color="success.main"
+          />
+        </Grid>
+        <Grid xs={12} sm={6} md={3}>
+          <StatCard
+            title="Total Games"
+            value={games.length}
+            icon={<CalendarToday />}
+            color="info.main"
+          />
+        </Grid>
+        <Grid xs={12} sm={6} md={3}>
+          <StatCard
+            title="Completed Games"
+            value={games.filter(game => game.status === 'completed').length}
+            icon={<EmojiEvents />}
+            color="warning.main"
+          />
+        </Grid>
+      </Grid>
 
-        <div className="card">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-green-100">
-              <User className="h-6 w-6 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Players</p>
-              <p className="text-2xl font-semibold text-gray-900">{players.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-blue-100">
-              <Calendar className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Games</p>
-              <p className="text-2xl font-semibold text-gray-900">{games.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-yellow-100">
-              <Trophy className="h-6 w-6 text-yellow-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Completed Games</p>
-              <p className="text-2xl font-semibold text-gray-900">
-                {games.filter(game => game.status === 'completed').length}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Grid container spacing={3}>
         {/* Top Teams */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">League Leaders</h2>
-            <Link to="/standings" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
-              View All
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {topTeams.map((standing) => (
-              <div key={standing.team._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center">
-                  <div className="flex items-center justify-center w-8 h-8 bg-primary-600 text-white rounded-full text-sm font-semibold mr-3">
-                    {standing.position}
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{standing.team.name}</p>
-                    <p className="text-sm text-gray-600">{standing.team.city}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-gray-900">{standing.points} pts</p>
-                  <p className="text-sm text-gray-600">{standing.wins}-{standing.losses}-{standing.ties}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <Grid xs={12} lg={6}>
+          <Card>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6" component="h2">
+                  League Leaders
+                </Typography>
+                <Link to="/standings" style={{ textDecoration: 'none' }}>
+                  <Typography variant="body2" color="primary">
+                    View All
+                  </Typography>
+                </Link>
+              </Box>
+              <List>
+                {topTeams.map((standing, index) => (
+                  <React.Fragment key={standing.team._id}>
+                    <ListItem>
+                      <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
+                        {standing.position}
+                      </Avatar>
+                      <ListItemText
+                        primary={standing.team.name}
+                        secondary={standing.team.city}
+                      />
+                      <ListItemSecondaryAction>
+                        <Box textAlign="right">
+                          <Typography variant="body2" fontWeight="bold">
+                            {standing.points} pts
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary">
+                            {standing.wins}-{standing.losses}-{standing.ties}
+                          </Typography>
+                        </Box>
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                    {index < topTeams.length - 1 && <Divider />}
+                  </React.Fragment>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
 
         {/* Recent Games */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Results</h2>
-            <Link to="/games" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
-              View All
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {recentGames.length > 0 ? (
-              recentGames.map((game) => (
-                <div key={game._id} className="p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">
-                        {game.homeTeam.name} vs {game.awayTeam.name}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {new Date(game.actualDate || game.scheduledDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-900">
-                        {game.score.homeTeam} - {game.score.awayTeam}
-                      </p>
-                      <p className="text-sm text-gray-600">{game.status}</p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-gray-500 text-center py-4">No recent games</p>
-            )}
-          </div>
-        </div>
-      </div>
+        <Grid xs={12} lg={6}>
+          <Card>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6" component="h2">
+                  Recent Results
+                </Typography>
+                <Link to="/games" style={{ textDecoration: 'none' }}>
+                  <Typography variant="body2" color="primary">
+                    View All
+                  </Typography>
+                </Link>
+              </Box>
+              <List>
+                {recentGames.length > 0 ? (
+                  recentGames.map((game, index) => (
+                    <React.Fragment key={game._id}>
+                      <ListItem>
+                        <ListItemText
+                          primary={`${game.homeTeam.name} vs ${game.awayTeam.name}`}
+                          secondary={new Date(game.actualDate || game.scheduledDate).toLocaleDateString()}
+                        />
+                        <ListItemSecondaryAction>
+                          <Box textAlign="right">
+                            <Typography variant="body2" fontWeight="bold">
+                              {game.score.homeTeam} - {game.score.awayTeam}
+                            </Typography>
+                            <Chip label={game.status} size="small" color="success" />
+                          </Box>
+                        </ListItemSecondaryAction>
+                      </ListItem>
+                      {index < recentGames.length - 1 && <Divider />}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <ListItem>
+                    <ListItemText
+                      primary="No recent games"
+                      sx={{ textAlign: 'center' }}
+                    />
+                  </ListItem>
+                )}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
       {/* Upcoming Games */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Upcoming Games</h2>
-          <Link to="/games" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
-            View All
-          </Link>
-        </div>
-        <div className="space-y-3">
-          {upcomingGames.length > 0 ? (
-            upcomingGames.map((game) => (
-              <div key={game._id} className="p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">
-                      {game.homeTeam.name} vs {game.awayTeam.name}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {game.venue.name} • {new Date(game.scheduledDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600">
-                      {new Date(game.scheduledDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {game.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-gray-500 text-center py-4">No upcoming games</p>
-          )}
-        </div>
-      </div>
-    </div>
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6" component="h2">
+              Upcoming Games
+            </Typography>
+            <Link to="/games" style={{ textDecoration: 'none' }}>
+              <Typography variant="body2" color="primary">
+                View All
+              </Typography>
+            </Link>
+          </Box>
+          <List>
+            {upcomingGames.length > 0 ? (
+              upcomingGames.map((game, index) => (
+                <React.Fragment key={game._id}>
+                  <ListItem>
+                    <ListItemText
+                      primary={`${game.homeTeam.name} vs ${game.awayTeam.name}`}
+                      secondary={`${game.venue.name} • ${new Date(game.scheduledDate).toLocaleDateString()}`}
+                    />
+                    <ListItemSecondaryAction>
+                      <Box textAlign="right">
+                        <Typography variant="body2" color="textSecondary">
+                          {new Date(game.scheduledDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </Typography>
+                        <Chip label={game.status} size="small" color="primary" />
+                      </Box>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  {index < upcomingGames.length - 1 && <Divider />}
+                </React.Fragment>
+              ))
+            ) : (
+              <ListItem>
+                <ListItemText
+                  primary="No upcoming games"
+                  sx={{ textAlign: 'center' }}
+                />
+              </ListItem>
+            )}
+          </List>
+        </CardContent>
+      </Card>
+    </Container>
   );
 };
 

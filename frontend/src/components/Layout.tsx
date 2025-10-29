@@ -1,15 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  Home, 
-  Users, 
-  User, 
-  Calendar, 
-  Trophy, 
-  Menu, 
-  X 
-} from 'lucide-react';
-import { useState } from 'react';
+import {
+  AppBar,
+  Box,
+  Drawer,
+  IconButton,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Toolbar,
+  Typography,
+  useTheme,
+} from '@mui/material';
+import {
+  Home,
+  People,
+  Person,
+  CalendarToday,
+  EmojiEvents,
+  Menu as MenuIcon,
+} from '@mui/icons-material';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,78 +29,125 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const theme = useTheme();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'Teams', href: '/teams', icon: Users },
-    { name: 'Players', href: '/players', icon: User },
-    { name: 'Games', href: '/games', icon: Calendar },
-    { name: 'Standings', href: '/standings', icon: Trophy },
+    { name: 'Teams', href: '/teams', icon: People },
+    { name: 'Players', href: '/players', icon: Person },
+    { name: 'Games', href: '/games', icon: CalendarToday },
+    { name: 'Standings', href: '/standings', icon: EmojiEvents },
   ];
 
-  const isActive = (href: string) => location.pathname === href;
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
+
+  const drawer = (
+    <Box>
+      <Toolbar>
+        <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
+          Open League
+        </Typography>
+      </Toolbar>
+      <List>
+        {navigation.map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.href;
+          return (
+            <ListItem key={item.name} disablePadding>
+              <ListItemButton
+                component={Link}
+                to={item.href}
+                onClick={() => setMobileOpen(false)}
+                sx={{
+                  backgroundColor: isActive ? theme.palette.primary.light : 'transparent',
+                  color: isActive ? theme.palette.primary.contrastText : 'inherit',
+                  '&:hover': {
+                    backgroundColor: isActive ? theme.palette.primary.light : theme.palette.action.hover,
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ color: isActive ? theme.palette.primary.contrastText : 'inherit' }}>
+                  <Icon />
+                </ListItemIcon>
+                <ListItemText primary={item.name} />
+              </ListItemButton>
+            </ListItem>
+          );
+        })}
+      </List>
+    </Box>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 rounded-md bg-white shadow-md"
+    <Box sx={{ display: 'flex' }}>
+      <AppBar
+        position="fixed"
+        sx={{
+          width: { lg: `calc(100% - ${240}px)` },
+          ml: { lg: `${240}px` },
+        }}
+      >
+        <Toolbar>
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            edge="start"
+            onClick={handleDrawerToggle}
+            sx={{ mr: 2, display: { lg: 'none' } }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h6" noWrap component="div">
+            Open League Management
+          </Typography>
+        </Toolbar>
+      </AppBar>
+
+      <Box
+        component="nav"
+        sx={{ width: { lg: 240 }, flexShrink: { lg: 0 } }}
+      >
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={handleDrawerToggle}
+          ModalProps={{
+            keepMounted: true,
+          }}
+          sx={{
+            display: { xs: 'block', lg: 'none' },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 240 },
+          }}
         >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </div>
+          {drawer}
+        </Drawer>
+        <Drawer
+          variant="permanent"
+          sx={{
+            display: { xs: 'none', lg: 'block' },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 240 },
+          }}
+          open
+        >
+          {drawer}
+        </Drawer>
+      </Box>
 
-      {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}>
-        <div className="flex items-center justify-center h-16 px-4 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-gray-900">Open League</h1>
-        </div>
-        
-        <nav className="mt-8 px-4">
-          <ul className="space-y-2">
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              return (
-                <li key={item.name}>
-                  <Link
-                    to={item.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                      isActive(item.href)
-                        ? 'bg-primary-100 text-primary-700 border-r-2 border-primary-600'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                    }`}
-                  >
-                    <Icon size={20} className="mr-3" />
-                    {item.name}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-      </div>
-
-      {/* Main content */}
-      <div className="lg:ml-64">
-        {/* Mobile overlay */}
-        {isMobileMenuOpen && (
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
-        )}
-        
-        <main className="p-6">
-          {children}
-        </main>
-      </div>
-    </div>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          width: { lg: `calc(100% - ${240}px)` },
+        }}
+      >
+        <Toolbar />
+        {children}
+      </Box>
+    </Box>
   );
 };
 
