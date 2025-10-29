@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, User, Mail, Phone, Calendar, Edit, Trash2 } from 'lucide-react';
 import { playersApi } from '../services/api';
-import { Player } from '../types';
+import type { Player } from '../types';
 
 const Players: React.FC = () => {
   const [players, setPlayers] = useState<Player[]>([]);

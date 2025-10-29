@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, User, Calendar, Trophy, TrendingUp, Activity } from 'lucide-react';
+import { Users, User, Calendar, Trophy } from 'lucide-react';
 import { teamsApi, playersApi, gamesApi, standingsApi } from '../services/api';
-import { Team, Player, Game, Standing } from '../types';
+import type { Team, Player, Game, Standing } from '../types';
 
 const Dashboard: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -125,7 +125,7 @@ const Dashboard: React.FC = () => {
             </Link>
           </div>
           <div className="space-y-3">
-            {topTeams.map((standing, index) => (
+            {topTeams.map((standing) => (
               <div key={standing.team._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center">
                   <div className="flex items-center justify-center w-8 h-8 bg-primary-600 text-white rounded-full text-sm font-semibold mr-3">

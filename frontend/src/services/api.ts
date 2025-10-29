@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Team, Player, Game, Standing, CreateTeamData, CreatePlayerData, CreateGameData } from '../types';
+import type { Team, Player, Game, Standing, CreateTeamData, CreatePlayerData, CreateGameData } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 

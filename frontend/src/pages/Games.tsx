@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Calendar, MapPin, Clock, Edit, Trash2 } from 'lucide-react';
 import { gamesApi, teamsApi } from '../services/api';
-import { Game, Team } from '../types';
+import type { Game, Team } from '../types';
 
 const Games: React.FC = () => {
   const [games, setGames] = useState<Game[]>([]);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Medal, TrendingUp, TrendingDown } from 'lucide-react';
 import { standingsApi } from '../services/api';
-import { Standing } from '../types';
+import type { Standing } from '../types';
 
 const Standings: React.FC = () => {
   const [standings, setStandings] = useState<Standing[]>([]);

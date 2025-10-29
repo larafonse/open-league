@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Users, MapPin, Calendar, Edit, Trash2 } from 'lucide-react';
+import { Plus, Users, MapPin, Edit, Trash2 } from 'lucide-react';
 import { teamsApi } from '../services/api';
-import { Team } from '../types';
+import type { Team } from '../types';
 
 const Teams: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
