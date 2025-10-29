@@ -6,7 +6,6 @@ import Players from './pages/Players';
 import Games from './pages/Games';
 import Standings from './pages/Standings';
 
-// Simple navigation with Tailwind CSS
 const Layout = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen bg-gray-50">
     <nav className="bg-white shadow-sm border-b border-gray-200 p-4">
