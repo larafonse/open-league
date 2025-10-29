@@ -84,7 +84,14 @@ A comprehensive web application for managing sports leagues, built with Node.js,
    JWT_EXPIRE=7d
    ```
 
-5. **Start the development servers**
+5. **Populate with test data (Optional)**
+   ```bash
+   cd backend
+   npm run seed    # Populate database with test data
+   npm run verify  # Verify the test data was created
+   ```
+
+6. **Start the development servers**
    ```bash
    # Start both backend and frontend
    npm run dev
@@ -206,6 +213,41 @@ open-league-manager/
 - Status: scheduled, in_progress, completed, etc.
 - Scoring: home/away scores
 - Events: goals, cards, substitutions, etc.
+
+## Test Data
+
+The application includes a comprehensive test data seeding system that populates your database with realistic sample data for development and testing.
+
+### What's Included
+
+- **6 Teams**: Thunder Bolts (Seattle), Fire Hawks (Phoenix), Storm Riders (Miami), Iron Wolves (Chicago), Golden Eagles (Denver), Blue Sharks (San Diego)
+- **66 Players**: 11 players per team with realistic positions, statistics, and contact information
+- **15 Games**: Mix of completed and scheduled games with scores, events, and statistics
+- **Complete Statistics**: Team standings, player stats, and game events automatically calculated
+
+### Quick Start with Test Data
+
+```bash
+# Seed the database
+cd backend
+npm run seed
+
+# Verify the data
+npm run verify
+
+# Start the application
+npm run dev
+```
+
+### Test Data Features
+
+- **Realistic Team Data**: Cities, colors, coaches, founding years
+- **Complete Player Profiles**: Positions, jersey numbers, statistics, emergency contacts
+- **Game Events**: Goals, assists, cards, substitutions with timestamps
+- **Automatic Calculations**: Team standings, win percentages, point differentials
+- **Varied Scenarios**: Mix of completed games, scheduled games, different venues
+
+For detailed information about the test data structure and customization options, see [TEST_DATA_README.md](./TEST_DATA_README.md).
 
 ## Development
 
