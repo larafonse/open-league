@@ -85,7 +85,6 @@ const Dashboard: React.FC = () => {
           <Box>
             <Typography color="textSecondary" gutterBottom variant="body2">
               {title}
-              THis is a test
             </Typography>
             <Typography variant="h4" component="div">
               {value}
@@ -100,7 +99,7 @@ const Dashboard: React.FC = () => {
     <Container maxWidth="xl">
       <Box mb={4}>
         <Typography variant="h3" component="h1" gutterBottom>
-          Dashboard
+          Dashboard FROM FLUXCD
         </Typography>
         <Typography variant="body1" color="textSecondary">
           Welcome to your sports league management system
