@@ -32,6 +32,7 @@ import {
   AccessTime,
   Edit,
   Delete,
+  Refresh,
 } from '@mui/icons-material';
 import { gamesApi, teamsApi } from '../services/api';
 import type { Game, Team } from '../types';
@@ -62,12 +63,17 @@ const Games: React.FC = () => {
 
   const fetchData = async () => {
     try {
+      console.log('Starting to fetch games...');
       const [gamesData, teamsData] = await Promise.all([
         gamesApi.getAll(),
         teamsApi.getAll()
       ]);
+      console.log('Games fetched:', gamesData.length, 'games');
+      console.log('Games data:', gamesData);
+      console.log('Setting games state with:', gamesData.length, 'games');
       setGames(gamesData);
       setTeams(teamsData);
+      console.log('Games state should now have:', gamesData.length, 'games');
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -149,14 +155,24 @@ const Games: React.FC = () => {
               Manage league games and schedules
             </Typography>
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => setShowCreateForm(true)}
-            size="large"
-          >
-            Schedule Game
-          </Button>
+          <Box display="flex" gap={2}>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => setShowCreateForm(true)}
+              size="large"
+            >
+              Schedule Game
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<Refresh />}
+              onClick={fetchData}
+              size="large"
+            >
+              Refresh
+            </Button>
+          </Box>
         </Box>
       </Box>
 
@@ -276,6 +292,13 @@ const Games: React.FC = () => {
         </form>
       </Dialog>
 
+      {/* Debug info */}
+      <Box mb={2}>
+        <Typography variant="body2" color="textSecondary">
+          Debug: games.length = {games.length}
+        </Typography>
+      </Box>
+
       {/* Games Table */}
       {games.length > 0 ? (
         <TableContainer component={Paper}>
@@ -283,6 +306,7 @@ const Games: React.FC = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Match</TableCell>
+                <TableCell>Season</TableCell>
                 <TableCell>Date & Time</TableCell>
                 <TableCell>Venue</TableCell>
                 <TableCell>Status</TableCell>
@@ -297,6 +321,17 @@ const Games: React.FC = () => {
                     <Typography variant="subtitle1" fontWeight="medium">
                       {game.homeTeam.name} vs {game.awayTeam.name}
                     </Typography>
+                  </TableCell>
+                  <TableCell>
+                    {game.season ? (
+                      <Typography variant="body2" fontWeight="medium">
+                        {game.season.name}
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" color="textSecondary">
+                        No Season
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Box>

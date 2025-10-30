@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Team, Player, Game, Standing, CreateTeamData, CreatePlayerData, CreateGameData } from '../types';
+import type { Team, Player, Game, Standing, Season, CreateTeamData, CreatePlayerData, CreateGameData, CreateSeasonData } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -53,6 +53,25 @@ export const gamesApi = {
 export const standingsApi = {
   getAll: (): Promise<Standing[]> => api.get('/standings').then(res => res.data),
   getByTeam: (teamId: string): Promise<Standing> => api.get(`/standings/${teamId}`).then(res => res.data),
+};
+
+// Seasons API
+export const seasonsApi = {
+  getAll: (params?: { status?: string }): Promise<Season[]> => 
+    api.get('/seasons', { params }).then(res => res.data),
+  getById: (id: string): Promise<Season> => api.get(`/seasons/${id}`).then(res => res.data),
+  create: (data: CreateSeasonData): Promise<Season> => api.post('/seasons', data).then(res => res.data),
+  update: (id: string, data: Partial<CreateSeasonData & { status?: string }>): Promise<Season> => 
+    api.put(`/seasons/${id}`, data).then(res => res.data),
+  delete: (id: string): Promise<void> => api.delete(`/seasons/${id}`).then(() => undefined),
+  generateSchedule: (id: string): Promise<Season> => 
+    api.post(`/seasons/${id}/generate-schedule`).then(res => res.data),
+  start: (id: string): Promise<Season> => 
+    api.post(`/seasons/${id}/start`).then(res => res.data),
+  complete: (id: string): Promise<Season> => 
+    api.post(`/seasons/${id}/complete`).then(res => res.data),
+  getStandings: (id: string): Promise<any[]> => 
+    api.get(`/seasons/${id}/standings`).then(res => res.data),
 };
 
 export default api;

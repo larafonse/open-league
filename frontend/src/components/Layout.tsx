@@ -20,6 +20,7 @@ import {
   Person,
   CalendarToday,
   EmojiEvents,
+  SportsSoccer,
   Menu as MenuIcon,
 } from '@mui/icons-material';
 
@@ -37,6 +38,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Teams', href: '/teams', icon: People },
     { name: 'Players', href: '/players', icon: Person },
     { name: 'Games', href: '/games', icon: CalendarToday },
+    { name: 'Seasons', href: '/seasons', icon: SportsSoccer },
     { name: 'Standings', href: '/standings', icon: EmojiEvents },
   ];
 

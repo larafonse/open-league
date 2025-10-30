@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const gameSchema = new mongoose.Schema({
+  season: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Season',
+    default: null
+  },
   homeTeam: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Team',

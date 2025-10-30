@@ -4,6 +4,48 @@ const { body, validationResult } = require('express-validator');
 const Game = require('../models/Game');
 const Team = require('../models/Team');
 
+// Debug endpoint to check all games
+router.get('/debug', async (req, res) => {
+  try {
+    console.log('Debug endpoint called');
+    console.log('Game model:', Game);
+    console.log('Game model type:', typeof Game);
+    
+    // Test if Game model has find method
+    if (typeof Game.find !== 'function') {
+      return res.status(500).json({ 
+        message: 'Game model does not have find method', 
+        gameModel: Game 
+      });
+    }
+    
+    const allGames = await Game.find({});
+    console.log('Raw games:', allGames);
+    console.log('Raw games count:', allGames ? allGames.length : 'undefined');
+    
+    // Test populate
+    console.log('Testing populate...');
+    const populatedGames = await Game.find({}).populate('homeTeam', 'name');
+    console.log('Populated games:', populatedGames);
+    console.log('First populated game:', populatedGames[0]);
+    
+    // Test if Team model works
+    console.log('Testing Team model...');
+    const team = await Team.findById('69017cf48f0f2b5e2b32fafa');
+    console.log('Team found:', team);
+    
+    res.json({ 
+      count: allGames ? allGames.length : 0, 
+      games: allGames || [],
+      populatedGames: populatedGames || [],
+      message: 'Debug successful'
+    });
+  } catch (error) {
+    console.error('Debug endpoint error:', error);
+    res.status(500).json({ message: 'Error fetching games', error: error.message });
+  }
+});
+
 // GET /api/games - Get all games
 router.get('/', async (req, res) => {
   try {
@@ -24,13 +66,37 @@ router.get('/', async (req, res) => {
       query.scheduledDate = { $gte: startDate, $lt: endDate };
     }
 
-    const games = await Game.find(query)
-      .populate('homeTeam', 'name city colors')
-      .populate('awayTeam', 'name city colors')
-      .sort({ scheduledDate: 1 });
+    console.log('Games API query:', query);
     
-    res.json(games);
+    // Get games without populate first
+    const rawGames = await Game.find(query).sort({ scheduledDate: 1 });
+    console.log(`Found ${rawGames.length} raw games`);
+    
+    // Manually populate games since populate is not working
+    console.log('Manually populating games...');
+    const manuallyPopulatedGames = await Promise.all(rawGames.map(async (game) => {
+      const homeTeam = await Team.findById(game.homeTeam);
+      const awayTeam = await Team.findById(game.awayTeam);
+      const season = await require('../models/Season').findById(game.season);
+      
+      return {
+        ...game.toObject(),
+        homeTeam: homeTeam ? { _id: homeTeam._id, name: homeTeam.name, city: homeTeam.city, colors: homeTeam.colors } : null,
+        awayTeam: awayTeam ? { _id: awayTeam._id, name: awayTeam.name, city: awayTeam.city, colors: awayTeam.colors } : null,
+        season: season ? { _id: season._id, name: season.name, status: season.status } : null
+      };
+    }));
+    
+    console.log('Manually populated games:', manuallyPopulatedGames.length);
+    console.log('First manually populated game:', manuallyPopulatedGames[0] ? {
+      homeTeam: manuallyPopulatedGames[0].homeTeam,
+      awayTeam: manuallyPopulatedGames[0].awayTeam,
+      season: manuallyPopulatedGames[0].season
+    } : 'No games');
+    
+    res.json(manuallyPopulatedGames);
   } catch (error) {
+    console.error('Games API error:', error);
     res.status(500).json({ message: 'Error fetching games', error: error.message });
   }
 });
@@ -83,7 +149,8 @@ router.post('/', [
     
     const populatedGame = await Game.findById(game._id)
       .populate('homeTeam', 'name city colors')
-      .populate('awayTeam', 'name city colors');
+      .populate('awayTeam', 'name city colors')
+      .populate('season', 'name status');
     
     res.status(201).json(populatedGame);
   } catch (error) {
@@ -124,7 +191,8 @@ router.put('/:id', [
     
     const populatedGame = await Game.findById(game._id)
       .populate('homeTeam', 'name city colors')
-      .populate('awayTeam', 'name city colors');
+      .populate('awayTeam', 'name city colors')
+      .populate('season', 'name status');
     
     res.json(populatedGame);
   } catch (error) {

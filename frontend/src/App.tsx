@@ -7,6 +7,7 @@ import Teams from './pages/Teams';
 import Players from './pages/Players';
 import Games from './pages/Games';
 import Standings from './pages/Standings';
+import Seasons from './pages/Seasons';
 import TeamDetail from './pages/TeamDetail';
 import PlayerDetail from './pages/PlayerDetail';
 import Layout from './components/Layout';
@@ -44,6 +45,7 @@ function App() {
             <Route path="/players" element={<Players />} />
             <Route path="/players/:id" element={<PlayerDetail />} />
             <Route path="/games" element={<Games />} />
+            <Route path="/seasons" element={<Seasons />} />
             <Route path="/standings" element={<Standings />} />
           </Routes>
         </Layout>

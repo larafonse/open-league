@@ -117,6 +117,7 @@ export interface Player extends BasePlayer {
 export interface Game extends BaseGame {
   homeTeam: BaseTeam;
   awayTeam: BaseTeam;
+  season?: BaseSeason;
   winner?: BaseTeam | 'tie';
   result?: {
     homeTeam: number;
@@ -169,5 +170,66 @@ export interface CreateGameData {
   referee?: {
     name: string;
     phone: string;
+  };
+}
+
+// Season interfaces
+export interface BaseSeason {
+  _id: string;
+  name: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  teams: BaseTeam[];
+  weeks: SeasonWeek[];
+  status: 'draft' | 'active' | 'completed' | 'cancelled';
+  settings: {
+    gamesPerWeek: number;
+    playoffTeams: number;
+    regularSeasonWeeks: number;
+  };
+  standings: SeasonStanding[];
+  totalWeeks: number;
+  completedWeeks: number;
+  progressPercentage: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SeasonWeek {
+  weekNumber: number;
+  startDate: string;
+  endDate: string;
+  games: string[] | BaseGame[];
+  isCompleted: boolean;
+}
+
+export interface SeasonStanding {
+  team: BaseTeam;
+  gamesPlayed: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  points: number;
+}
+
+export interface Season extends BaseSeason {
+  weeks: SeasonWeek[];
+  standings: SeasonStanding[];
+}
+
+export interface CreateSeasonData {
+  name: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  teams: string[];
+  settings?: {
+    gamesPerWeek?: number;
+    playoffTeams?: number;
+    regularSeasonWeeks?: number;
   };
 }
