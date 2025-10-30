@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  AppBar,
   Box,
   Drawer,
-  IconButton,
   List,
   ListItem,
   ListItemButton,
@@ -21,7 +19,6 @@ import {
   CalendarToday,
   EmojiEvents,
   SportsSoccer,
-  Menu as MenuIcon,
 } from '@mui/icons-material';
 
 interface LayoutProps {

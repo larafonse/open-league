@@ -5,8 +5,7 @@ metadata:
   namespace: flux-system
 spec:
   interval: 1m
-  url: file:///
+  url: https://github.com/larafonse/open-league
   ref:
     branch: main
-  gitImplementation: libgit2
 

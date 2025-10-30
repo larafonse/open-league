@@ -13,7 +13,8 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   Avatar,
-  Divider,Grid } from '@mui/material';
+  Divider,
+  Grid } from '@mui/material';
 import {
   People,
   Person,
@@ -84,6 +85,7 @@ const Dashboard: React.FC = () => {
           <Box>
             <Typography color="textSecondary" gutterBottom variant="body2">
               {title}
+              THis is a test
             </Typography>
             <Typography variant="h4" component="div">
               {value}
@@ -107,7 +109,7 @@ const Dashboard: React.FC = () => {
 
       {/* Stats Cards */}
       <Grid container spacing={3} mb={4}>
-        <Grid xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Total Teams"
             value={teams.length}
@@ -115,7 +117,7 @@ const Dashboard: React.FC = () => {
             color="primary.main"
           />
         </Grid>
-        <Grid xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Total Players"
             value={players.length}
@@ -123,7 +125,7 @@ const Dashboard: React.FC = () => {
             color="success.main"
           />
         </Grid>
-        <Grid xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Total Games"
             value={games.length}
@@ -131,7 +133,7 @@ const Dashboard: React.FC = () => {
             color="info.main"
           />
         </Grid>
-        <Grid xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Completed Games"
             value={games.filter(game => game.status === 'completed').length}
@@ -143,7 +145,7 @@ const Dashboard: React.FC = () => {
 
       <Grid container spacing={3}>
         {/* Top Teams */}
-        <Grid xs={12} lg={6}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Card>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -187,7 +189,7 @@ const Dashboard: React.FC = () => {
         </Grid>
 
         {/* Recent Games */}
-        <Grid xs={12} lg={6}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Card>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -234,7 +236,7 @@ const Dashboard: React.FC = () => {
           </Card>
         </Grid>
         {/* Upcoming Games */}
-        <Grid xs={12} lg={6}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Card>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
