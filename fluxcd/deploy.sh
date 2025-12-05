@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-echo -e "${BLUE}🚀 Deploying Open League to Kind Cluster using FluxCD${NC}"
+echo -e "${BLUE}🚀 Deploying Arch Suite to Kind Cluster using FluxCD${NC}"
 echo ""
 
 # Check prerequisites
@@ -30,7 +30,7 @@ check_command docker
 check_command kubectl
 
 # Check if cluster exists
-CLUSTER_NAME="open-league"
+CLUSTER_NAME="arch-suite"
 if kind get clusters | grep -q "^${CLUSTER_NAME}$"; then
     echo -e "${YELLOW}⚠️  Kind cluster '${CLUSTER_NAME}' already exists. Skipping creation.${NC}"
 else
@@ -53,12 +53,12 @@ kubectl wait --namespace ingress-nginx \
 # Build and load Docker images
 echo -e "${GREEN}🐳 Building and loading Docker images...${NC}"
 cd "${PROJECT_ROOT}/backend"
-docker build -t open-league-backend:latest -f Dockerfile .
-kind load docker-image open-league-backend:latest --name "${CLUSTER_NAME}"
+docker build -t arch-suite-backend:latest -f Dockerfile .
+kind load docker-image arch-suite-backend:latest --name "${CLUSTER_NAME}"
 
 cd "${PROJECT_ROOT}/frontend"
-docker build -t open-league-frontend:latest -f Dockerfile .
-kind load docker-image open-league-frontend:latest --name "${CLUSTER_NAME}"
+docker build -t arch-suite-frontend:latest -f Dockerfile .
+kind load docker-image arch-suite-frontend:latest --name "${CLUSTER_NAME}"
 
 # Bootstrap FluxCD
 echo -e "${GREEN}🎯 Bootstrapping FluxCD...${NC}"
@@ -75,7 +75,7 @@ kubectl apply -f git-repository.yaml
 
 # Wait for GitRepository to be ready
 echo -e "${GREEN}⏳ Waiting for GitRepository to be ready...${NC}"
-kubectl wait --for=condition=ready gitrepository/open-league -n flux-system --timeout=300s
+kubectl wait --for=condition=ready gitrepository/arch-suite -n flux-system --timeout=300s
 
 # Apply HelmRelease
 echo -e "${GREEN}📝 Applying HelmRelease manifest...${NC}"
@@ -85,29 +85,29 @@ kubectl apply -f helm-release.yaml
 echo -e "${GREEN}⏳ Waiting for deployment to be ready...${NC}"
 sleep 10
 kubectl wait --for=condition=ready pod \
-  --selector=app.kubernetes.io/name=open-league \
+  --selector=app.kubernetes.io/name=arch-suite \
   --timeout=300s || echo -e "${YELLOW}⚠️  Deployment timeout, checking status...${NC}"
 
 # Show deployment status
 echo -e "${GREEN}✅ Deployment process initiated!${NC}"
 echo ""
 echo -e "${BLUE}📊 Current Pod Status:${NC}"
-kubectl get pods -l app.kubernetes.io/name=open-league 2>/dev/null || echo "No pods found yet"
+kubectl get pods -l app.kubernetes.io/name=arch-suite 2>/dev/null || echo "No pods found yet"
 echo ""
 echo -e "${BLUE}📊 HelmRelease Status:${NC}"
 kubectl get helmreleases -n default
 echo ""
 echo -e "${BLUE}🌐 Access the application at:${NC}"
-echo "http://open-league.local"
+echo "http://arch-suite.local"
 echo ""
 echo -e "${BLUE}📋 Useful commands:${NC}"
 echo "  kubectl get helmreleases -n default"
 echo "  kubectl get pods -n default"
-echo "  kubectl logs -l app.kubernetes.io/name=open-league -n default -c backend"
-echo "  kubectl logs -l app.kubernetes.io/name=open-league -n default -c frontend"
+echo "  kubectl logs -l app.kubernetes.io/name=arch-suite -n default -c backend"
+echo "  kubectl logs -l app.kubernetes.io/name=arch-suite -n default -c frontend"
 echo "  flux get sources git -A"
 echo "  flux get helmreleases -A"
 echo ""
-echo -e "${YELLOW}💡 Don't forget to add open-league.local to your /etc/hosts file:${NC}"
-echo "  echo '127.0.0.1 open-league.local' | sudo tee -a /etc/hosts"
+echo -e "${YELLOW}💡 Don't forget to add arch-suite.local to your /etc/hosts file:${NC}"
+echo "  echo '127.0.0.1 arch-suite.local' | sudo tee -a /etc/hosts"
 

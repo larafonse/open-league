@@ -1,11 +1,11 @@
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
-  name: open-league
+  name: arch-suite
   namespace: flux-system
 spec:
   interval: 1m
-  url: https://github.com/larafonse/open-league
+  url: https://github.com/larafonse/arch-suite
   ref:
     branch: main
 

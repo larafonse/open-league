@@ -47,7 +47,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <Box>
       <Toolbar>
         <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
-          Open League
+          Arch Suite
         </Typography>
       </Toolbar>
       <List>
@@ -100,7 +100,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div">
-            Open League Management
+            Arch Suite Management
           </Typography>
         </Toolbar>
       </AppBar> */}

@@ -7,7 +7,7 @@ const Player = require('./models/Player');
 const Game = require('./models/Game');
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/open-league', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/arch-suite', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });

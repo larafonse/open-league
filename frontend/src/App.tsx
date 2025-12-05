@@ -26,7 +26,7 @@ const theme = createTheme({
     },
   },
   typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: '"Science Gothic", "Roboto", "Helvetica", "Arial", sans-serif',
   },
 });
 

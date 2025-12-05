@@ -1,4 +1,4 @@
-# Open League Frontend Dockerfile
+# Arch Suite Frontend Dockerfile
 # Multi-stage build
 FROM node:18-alpine AS builder
 

@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "open-league.name" -}}
+{{- define "arch-suite.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "open-league.fullname" -}}
+{{- define "arch-suite.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "open-league.chart" -}}
+{{- define "arch-suite.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "open-league.labels" -}}
-helm.sh/chart: {{ include "open-league.chart" . }}
-{{ include "open-league.selectorLabels" . }}
+{{- define "arch-suite.labels" -}}
+helm.sh/chart: {{ include "arch-suite.chart" . }}
+{{ include "arch-suite.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,17 +45,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "open-league.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "open-league.name" . }}
+{{- define "arch-suite.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "arch-suite.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "open-league.serviceAccountName" -}}
+{{- define "arch-suite.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "open-league.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "arch-suite.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}

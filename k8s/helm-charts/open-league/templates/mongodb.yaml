@@ -2,19 +2,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "open-league.fullname" . }}-mongodb
+  name: {{ include "arch-suite.fullname" . }}-mongodb
   labels:
-    {{- include "open-league.labels" . | nindent 4 }}
+    {{- include "arch-suite.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "open-league.selectorLabels" . | nindent 6 }}
+      {{- include "arch-suite.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: mongodb
   template:
     metadata:
       labels:
-        {{- include "open-league.selectorLabels" . | nindent 8 }}
+        {{- include "arch-suite.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: mongodb
     spec:
       containers:
@@ -27,7 +27,7 @@ spec:
               protocol: TCP
           env:
             - name: MONGO_INITDB_DATABASE
-              value: "open-league"
+              value: "arch-suite"
           {{- if .Values.mongodb.persistence.enabled }}
           volumeMounts:
             - name: mongodb-storage
@@ -49,7 +49,7 @@ spec:
       volumes:
         - name: mongodb-storage
           persistentVolumeClaim:
-            claimName: {{ include "open-league.fullname" . }}-mongodb-pvc
+            claimName: {{ include "arch-suite.fullname" . }}-mongodb-pvc
       {{- else }}
       volumes:
         - name: mongodb-storage
@@ -59,9 +59,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "open-league.fullname" . }}-mongodb
+  name: {{ include "arch-suite.fullname" . }}-mongodb
   labels:
-    {{- include "open-league.labels" . | nindent 4 }}
+    {{- include "arch-suite.labels" . | nindent 4 }}
 spec:
   type: ClusterIP
   ports:
@@ -70,6 +70,6 @@ spec:
       protocol: TCP
       name: mongodb
   selector:
-    {{- include "open-league.selectorLabels" . | nindent 4 }}
+    {{- include "arch-suite.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: mongodb
 {{- end }}

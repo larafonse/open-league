@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/open-league', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/arch-suite', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
@@ -29,7 +29,7 @@ app.use('/api/seasons', require('./routes/seasons'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Open League API is running' });
+  res.json({ status: 'OK', message: 'Arch Suite API is running' });
 });
 
 // Error handling middleware

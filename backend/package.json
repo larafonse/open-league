@@ -1,5 +1,5 @@
 {
-  "name": "open-league-backend",
+  "name": "arch-suite-backend",
   "version": "1.0.0",
   "description": "Backend API for open-source league management",
   "main": "src/server.js",

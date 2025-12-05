@@ -1,5 +1,5 @@
 apiVersion: v2
-name: open-league
+name: arch-suite
 description: A Helm chart for Sports League Management System
 type: application
 version: 0.1.0
@@ -10,9 +10,9 @@ keywords:
   - management
   - nodejs
   - react
-home: https://github.com/your-org/open-league
+home: https://github.com/your-org/arch-suite
 sources:
-  - https://github.com/your-org/open-league
+  - https://github.com/your-org/arch-suite
 maintainers:
   - name: Your Name
     email: your.email@example.com

@@ -1,4 +1,4 @@
-# Open League Backend Dockerfile
+# Arch Suite Backend Dockerfile
 FROM node:18-alpine
 
 WORKDIR /app
