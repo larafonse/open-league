@@ -26,17 +26,14 @@ import {
   Tabs,
 } from '@mui/material';
 import {
-  Groups,
-  Person,
   Public,
   Lock,
   Edit,
   Delete,
   Add,
   CalendarToday,
-  People,
 } from '@mui/icons-material';
-import { leaguesApi, seasonsApi } from '../services/api';
+import { leaguesApi } from '../services/api';
 import type { League, Season } from '../types';
 
 const LeagueDetail: React.FC = () => {
@@ -53,7 +50,6 @@ const LeagueDetail: React.FC = () => {
     description: '',
     isPublic: true,
   });
-  const [newMemberEmail, setNewMemberEmail] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -202,7 +198,7 @@ const LeagueDetail: React.FC = () => {
       </Box>
 
       <Card sx={{ mb: 3 }}>
-        <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
+        <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
           <Tab label="Overview" />
           <Tab label="Seasons" />
           <Tab label="Members" />
@@ -303,14 +299,16 @@ const LeagueDetail: React.FC = () => {
           <CardContent>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="h6">Seasons</Typography>
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                component={Link}
-                to={`/seasons?league=${league._id}`}
-              >
-                Create Season
-              </Button>
+              {league.isOwner && (
+                <Button
+                  variant="contained"
+                  startIcon={<Add />}
+                  component={Link}
+                  to={`/seasons?league=${league._id}`}
+                >
+                  Create Season
+                </Button>
+              )}
             </Box>
             {seasons.length === 0 ? (
               <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
@@ -323,7 +321,7 @@ const LeagueDetail: React.FC = () => {
                     <Card
                       component={Link}
                       to={`/seasons/${season._id}`}
-                      sx={{ textDecoration: 'none', height: '100%' }}
+                      sx={{ textDecoration: 'none', height: '100%', '&:hover': { boxShadow: 3 } }}
                     >
                       <CardContent>
                         <Typography variant="h6" gutterBottom>
@@ -346,8 +344,15 @@ const LeagueDetail: React.FC = () => {
                           {new Date(season.endDate).toLocaleDateString()}
                         </Typography>
                         <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                          {season.teams.length} teams
+                          {Array.isArray(season.teams) ? season.teams.length : 0} teams
                         </Typography>
+                        {season.status === 'completed' && season.standings && season.standings.length > 0 && (
+                          <Box sx={{ mt: 1 }}>
+                            <Typography variant="caption" color="textSecondary">
+                              Winner: {season.standings[0]?.team?.name || 'N/A'}
+                            </Typography>
+                          </Box>
+                        )}
                       </CardContent>
                     </Card>
                   </Grid>
@@ -362,7 +367,7 @@ const LeagueDetail: React.FC = () => {
         <Card>
           <CardContent>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6">Members</Typography>
+              <Typography variant="h6">Members ({league.memberCount})</Typography>
               {league.isOwner && (
                 <Button
                   variant="contained"
@@ -376,8 +381,8 @@ const LeagueDetail: React.FC = () => {
             <List>
               <ListItem>
                 <ListItemAvatar>
-                  <Avatar>
-                    <Person />
+                  <Avatar sx={{ bgcolor: 'secondary.main' }}>
+                    {league.owner.firstName[0]}{league.owner.lastName[0]}
                   </Avatar>
                 </ListItemAvatar>
                 <ListItemText
@@ -386,36 +391,41 @@ const LeagueDetail: React.FC = () => {
                 />
                 <Chip label="Owner" color="secondary" size="small" />
               </ListItem>
-              <Divider />
-              {league.members.map((member) => (
-                <React.Fragment key={member._id}>
-                  <ListItem>
-                    <ListItemAvatar>
-                      <Avatar>
-                        {member.firstName[0]}{member.lastName[0]}
-                      </Avatar>
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={`${member.firstName} ${member.lastName}`}
-                      secondary={member.email}
-                    />
-                    {league.isOwner && (
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => handleRemoveMember(member._id)}
-                      >
-                        <Delete />
-                      </IconButton>
-                    )}
-                  </ListItem>
-                  <Divider />
-                </React.Fragment>
-              ))}
-              {league.members.length === 0 && (
-                <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 2 }}>
-                  No additional members
-                </Typography>
+              {league.members && league.members.length > 0 && <Divider sx={{ my: 1 }} />}
+              {league.members && league.members.length > 0 ? (
+                league.members.map((member, index) => (
+                  <React.Fragment key={member._id}>
+                    <ListItem>
+                      <ListItemAvatar>
+                        <Avatar>
+                          {member.firstName?.[0]}{member.lastName?.[0]}
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={`${member.firstName} ${member.lastName}`}
+                        secondary={member.email}
+                      />
+                      {league.isOwner && (
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleRemoveMember(member._id)}
+                        >
+                          <Delete />
+                        </IconButton>
+                      )}
+                    </ListItem>
+                    {index < league.members.length - 1 && <Divider />}
+                  </React.Fragment>
+                ))
+              ) : (
+                <ListItem>
+                  <ListItemText
+                    primary="No additional members"
+                    secondary="Only the owner is a member of this league"
+                    sx={{ textAlign: 'center', py: 2 }}
+                  />
+                </ListItem>
               )}
             </List>
           </CardContent>

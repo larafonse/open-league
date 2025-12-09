@@ -5,6 +5,9 @@ require('dotenv').config();
 const Team = require('./models/Team');
 const Player = require('./models/Player');
 const Game = require('./models/Game');
+const League = require('./models/League');
+const Season = require('./models/Season');
+const User = require('./models/User');
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/arch-suite', {
@@ -183,7 +186,65 @@ async function seedDatabase() {
     await Team.deleteMany({});
     await Player.deleteMany({});
     await Game.deleteMany({});
+    await Season.deleteMany({});
+    await League.deleteMany({});
+    // Note: We'll create a test user if one doesn't exist, but won't delete existing users
     console.log('Cleared existing data');
+    
+    // Create or get test user
+    let testUser = await User.findOne({ email: 'admin@archsuite.com' });
+    if (!testUser) {
+      testUser = new User({
+        email: 'admin@archsuite.com',
+        password: 'password123', // Will be hashed by pre-save hook
+        firstName: 'Admin',
+        lastName: 'User',
+        role: 'admin'
+      });
+      await testUser.save();
+      console.log('Created test user: admin@archsuite.com / password123');
+    } else {
+      console.log('Using existing test user: admin@archsuite.com');
+    }
+    
+    // Create additional random users
+    console.log('\n=== CREATING USERS ===');
+    const users = [testUser];
+    const userNames = [
+      { firstName: 'John', lastName: 'Smith' },
+      { firstName: 'Sarah', lastName: 'Johnson' },
+      { firstName: 'Michael', lastName: 'Williams' },
+      { firstName: 'Emily', lastName: 'Brown' },
+      { firstName: 'David', lastName: 'Jones' },
+      { firstName: 'Jessica', lastName: 'Garcia' },
+      { firstName: 'Christopher', lastName: 'Miller' },
+      { firstName: 'Amanda', lastName: 'Davis' },
+      { firstName: 'Matthew', lastName: 'Rodriguez' },
+      { firstName: 'Ashley', lastName: 'Martinez' },
+      { firstName: 'James', lastName: 'Hernandez' },
+      { firstName: 'Melissa', lastName: 'Lopez' }
+    ];
+    
+    for (let i = 0; i < userNames.length; i++) {
+      const name = userNames[i];
+      const email = `${name.firstName.toLowerCase()}.${name.lastName.toLowerCase()}@example.com`;
+      
+      let user = await User.findOne({ email });
+      if (!user) {
+        user = new User({
+          email,
+          password: 'password123', // Will be hashed by pre-save hook
+          firstName: name.firstName,
+          lastName: name.lastName,
+          role: 'user'
+        });
+        await user.save();
+        console.log(`Created user: ${email} / password123`);
+      } else {
+        console.log(`Using existing user: ${email}`);
+      }
+      users.push(user);
+    }
     
     // Create teams
     const teams = [];
@@ -364,6 +425,261 @@ async function seedDatabase() {
     sortedTeams.forEach((team, index) => {
       const points = team.wins * 3 + team.ties;
       console.log(`${index + 1}. ${team.name} (${team.city}) - ${points} pts (${team.wins}W-${team.losses}L-${team.ties}T)`);
+    });
+    
+    // Create leagues
+    console.log('\n=== CREATING LEAGUES ===');
+    const leagues = [];
+    const leagueData = [
+      {
+        name: 'Premier Soccer League',
+        description: 'The premier competitive soccer league featuring top teams from across the region.',
+        isPublic: true,
+        settings: { maxTeams: 20, minTeams: 4 }
+      },
+      {
+        name: 'Metro Championship League',
+        description: 'A competitive league for metropolitan area teams with a focus on community engagement.',
+        isPublic: true,
+        settings: { maxTeams: 16, minTeams: 4 }
+      },
+      {
+        name: 'Coastal Conference',
+        description: 'Regional league for teams along the coast, emphasizing fair play and sportsmanship.',
+        isPublic: true,
+        settings: { maxTeams: 12, minTeams: 4 }
+      },
+      {
+        name: 'Elite Division',
+        description: 'Exclusive league for elite teams with high-level competition.',
+        isPublic: false,
+        settings: { maxTeams: 10, minTeams: 4 }
+      }
+    ];
+    
+    for (let i = 0; i < leagueData.length; i++) {
+      const leagueInfo = leagueData[i];
+      // Distribute league ownership among users
+      const owner = i === 0 ? testUser : users[Math.floor(Math.random() * (users.length - 1)) + 1];
+      
+      // Add random members to each league (3-6 members per league)
+      // Users can be in multiple leagues, so we don't filter out users already in other leagues
+      const memberCount = Math.floor(Math.random() * 4) + 3; // 3-6 members
+      const availableUsers = users.filter(u => u._id.toString() !== owner._id.toString());
+      const shuffled = [...availableUsers].sort(() => 0.5 - Math.random());
+      const members = shuffled.slice(0, Math.min(memberCount, availableUsers.length));
+      
+      const league = new League({
+        ...leagueInfo,
+        owner: owner._id,
+        members: members.map(u => u._id)
+      });
+      await league.save();
+      leagues.push(league);
+      console.log(`Created league: ${league.name} (Owner: ${owner.firstName} ${owner.lastName}, ${members.length} members)`);
+      if (members.length > 0) {
+        console.log(`  Members: ${members.map(u => `${u.firstName} ${u.lastName}`).join(', ')}`);
+      }
+    }
+    
+    // Distribute teams across leagues and create seasons
+    console.log('\n=== CREATING SEASONS ===');
+    const teamsPerLeague = Math.floor(teams.length / leagues.length);
+    let teamIndex = 0;
+    
+    // Distribute teams to leagues
+    const leagueTeamMap = new Map();
+    for (let i = 0; i < leagues.length; i++) {
+      const league = leagues[i];
+      const leagueTeams = [];
+      
+      // Assign teams to this league (distribute evenly)
+      for (let j = 0; j < teamsPerLeague && teamIndex < teams.length; j++) {
+        leagueTeams.push(teams[teamIndex]);
+        teamIndex++;
+      }
+      
+      // If last league, add remaining teams
+      if (i === leagues.length - 1) {
+        while (teamIndex < teams.length) {
+          leagueTeams.push(teams[teamIndex]);
+          teamIndex++;
+        }
+      }
+      
+      leagueTeamMap.set(league._id.toString(), leagueTeams);
+    }
+    
+    // Create seasons for each league
+    const currentYear = new Date().getFullYear();
+    
+    for (let i = 0; i < leagues.length; i++) {
+      const league = leagues[i];
+      const leagueTeams = leagueTeamMap.get(league._id.toString());
+      
+      // Create previous seasons (completed)
+      const previousSeasonsCount = i < 2 ? 2 : 1; // First 2 leagues get 2 previous seasons, others get 1
+      
+      for (let seasonNum = previousSeasonsCount; seasonNum >= 1; seasonNum--) {
+        const year = currentYear - seasonNum;
+        const seasonStartDate = new Date(year, 0, 1); // January 1st
+        const seasonEndDate = new Date(year, 11, 31); // December 31st
+        
+        const season = new Season({
+          name: `${league.name} - ${year} Season`,
+          description: `${year} regular season for ${league.name}`,
+          league: league._id,
+          startDate: seasonStartDate,
+          endDate: seasonEndDate,
+          teams: leagueTeams.map(t => t._id),
+          status: 'completed',
+          settings: {
+            gamesPerWeek: 1,
+            playoffTeams: 4,
+            regularSeasonWeeks: 12
+          },
+          standings: leagueTeams.map(team => ({
+            team: team._id,
+            gamesPlayed: Math.floor(Math.random() * 15) + 8, // 8-22 games
+            wins: Math.floor(Math.random() * 10) + 3,
+            losses: Math.floor(Math.random() * 8) + 2,
+            ties: Math.floor(Math.random() * 5),
+            pointsFor: Math.floor(Math.random() * 50) + 20,
+            pointsAgainst: Math.floor(Math.random() * 40) + 15,
+            points: 0
+          })),
+          weeks: []
+        });
+        
+        // Calculate points for completed season
+        season.standings.forEach(standing => {
+          standing.points = standing.wins * 3 + standing.ties;
+        });
+        
+        // Sort standings by points
+        season.standings.sort((a, b) => {
+          if (b.points !== a.points) return b.points - a.points;
+          const aDiff = a.pointsFor - a.pointsAgainst;
+          const bDiff = b.pointsFor - b.pointsAgainst;
+          return bDiff - aDiff;
+        });
+        
+        await season.save();
+        console.log(`Created completed season "${season.name}" for ${league.name}`);
+      }
+      
+      // Create active season for first league, draft for others
+      const isActiveLeague = i === 0; // First league gets active season
+      const seasonStartDate = new Date();
+      seasonStartDate.setMonth(seasonStartDate.getMonth() - 2); // Started 2 months ago
+      const seasonEndDate = new Date(seasonStartDate);
+      seasonEndDate.setMonth(seasonEndDate.getMonth() + 6); // 6 months duration
+      
+      const activeSeason = new Season({
+        name: `${league.name} - ${currentYear} Season`,
+        description: `${currentYear} regular season for ${league.name}`,
+        league: league._id,
+        startDate: seasonStartDate,
+        endDate: seasonEndDate,
+        teams: leagueTeams.map(t => t._id),
+        status: isActiveLeague ? 'active' : 'draft',
+        settings: {
+          gamesPerWeek: 1,
+          playoffTeams: 4,
+          regularSeasonWeeks: 12
+        },
+        standings: leagueTeams.map(team => ({
+          team: team._id,
+          gamesPlayed: 0,
+          wins: 0,
+          losses: 0,
+          ties: 0,
+          pointsFor: 0,
+          pointsAgainst: 0,
+          points: 0
+        })),
+        weeks: []
+      });
+      
+      // If active season, add some game data
+      if (isActiveLeague) {
+        for (const game of games) {
+          const homeTeam = leagueTeams.find(t => t._id.toString() === game.homeTeam.toString());
+          const awayTeam = leagueTeams.find(t => t._id.toString() === game.awayTeam.toString());
+          
+          if (homeTeam && awayTeam && game.status === 'completed') {
+            const homeStanding = activeSeason.standings.find(s => s.team.toString() === homeTeam._id.toString());
+            const awayStanding = activeSeason.standings.find(s => s.team.toString() === awayTeam._id.toString());
+            
+            if (homeStanding && awayStanding) {
+              homeStanding.gamesPlayed++;
+              awayStanding.gamesPlayed++;
+              
+              homeStanding.pointsFor += game.score.homeTeam;
+              homeStanding.pointsAgainst += game.score.awayTeam;
+              awayStanding.pointsFor += game.score.awayTeam;
+              awayStanding.pointsAgainst += game.score.homeTeam;
+              
+              if (game.score.homeTeam > game.score.awayTeam) {
+                homeStanding.wins++;
+                awayStanding.losses++;
+                homeStanding.points += 3;
+              } else if (game.score.awayTeam > game.score.homeTeam) {
+                awayStanding.wins++;
+                homeStanding.losses++;
+                awayStanding.points += 3;
+              } else {
+                homeStanding.ties++;
+                awayStanding.ties++;
+                homeStanding.points += 1;
+                awayStanding.points += 1;
+              }
+            }
+          }
+        }
+      }
+      
+      await activeSeason.save();
+      console.log(`Created ${isActiveLeague ? 'active' : 'draft'} season "${activeSeason.name}" for ${league.name} with ${leagueTeams.length} teams`);
+    }
+    
+    console.log('\n=== SEEDING SUMMARY ===');
+    const totalSeasons = await Season.countDocuments();
+    const activeSeasons = await Season.countDocuments({ status: 'active' });
+    const completedSeasons = await Season.countDocuments({ status: 'completed' });
+    const draftSeasons = await Season.countDocuments({ status: 'draft' });
+    
+    console.log(`Created ${users.length} users`);
+    console.log(`Created ${leagues.length} leagues`);
+    console.log(`Created ${totalSeasons} seasons:`);
+    console.log(`  - ${activeSeasons} active season(s)`);
+    console.log(`  - ${completedSeasons} completed season(s)`);
+    console.log(`  - ${draftSeasons} draft season(s)`);
+    console.log(`Created ${teams.length} teams`);
+    console.log(`Created ${allPlayers.length} players`);
+    console.log(`Created ${games.length} games`);
+    console.log('\n=== LEAGUE DETAILS ===');
+    for (const league of leagues) {
+      const leagueSeasons = await Season.find({ league: league._id });
+      const populatedLeague = await League.findById(league._id).populate('owner members', 'firstName lastName email');
+      const activeLeagueSeason = leagueSeasons.find(s => s.status === 'active');
+      console.log(`${league.name}:`);
+      console.log(`  - Owner: ${populatedLeague.owner.firstName} ${populatedLeague.owner.lastName}`);
+      console.log(`  - Members: ${populatedLeague.members.length}`);
+      console.log(`  - ${leagueSeasons.length} season(s) total`);
+      if (activeLeagueSeason) {
+        console.log(`  - Active: ${activeLeagueSeason.name}`);
+      }
+      const completedLeagueSeasons = leagueSeasons.filter(s => s.status === 'completed');
+      if (completedLeagueSeasons.length > 0) {
+        console.log(`  - Previous: ${completedLeagueSeasons.map(s => s.name).join(', ')}`);
+      }
+    }
+    console.log('\n=== USER CREDENTIALS ===');
+    console.log('All users have password: password123');
+    console.log('Admin: admin@archsuite.com');
+    users.slice(1).forEach(user => {
+      console.log(`${user.firstName} ${user.lastName}: ${user.email}`);
     });
     
   } catch (error) {

@@ -87,6 +87,7 @@ router.get('/:id', authenticate, async (req, res) => {
     const leagueObj = league.toObject();
     leagueObj.isMember = league.isMember(req.user._id);
     leagueObj.isOwner = league.owner._id.toString() === req.user._id.toString();
+    leagueObj.canView = league.isPublic || leagueObj.isMember; // Can view if public or member
 
     res.json(leagueObj);
   } catch (error) {
@@ -274,8 +275,8 @@ router.get('/:id/seasons', authenticate, async (req, res) => {
       return res.status(404).json({ message: 'League not found' });
     }
 
-    // Check if user is a member
-    if (!league.isMember(req.user._id)) {
+    // Allow access if league is public OR user is a member
+    if (!league.isPublic && !league.isMember(req.user._id)) {
       return res.status(403).json({ message: 'You must be a member of this league to view seasons' });
     }
 

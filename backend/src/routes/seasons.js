@@ -7,7 +7,7 @@ const Game = require('../models/Game');
 const League = require('../models/League');
 const authenticate = require('../middleware/auth');
 
-// GET /api/seasons - Get all seasons (filtered by user's leagues)
+// GET /api/seasons - Get all seasons (filtered by user's leagues and public leagues)
 router.get('/', authenticate, async (req, res) => {
   try {
     const { status, league } = req.query;
@@ -21,9 +21,19 @@ router.get('/', authenticate, async (req, res) => {
       ]
     }).select('_id');
 
-    const leagueIds = userLeagues.map(l => l._id);
+    // Get all public leagues
+    const publicLeagues = await League.find({ isPublic: true }).select('_id');
 
-    let query = { league: { $in: leagueIds } };
+    // Combine user leagues and public leagues
+    const allLeagueIds = [
+      ...userLeagues.map(l => l._id),
+      ...publicLeagues.map(l => l._id)
+    ];
+
+    // Remove duplicates
+    const uniqueLeagueIds = [...new Set(allLeagueIds.map(id => id.toString()))];
+
+    let query = { league: { $in: uniqueLeagueIds } };
 
     if (status) query.status = status;
     if (league) query.league = league;
@@ -59,9 +69,12 @@ router.get('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ message: 'Season not found' });
     }
 
-    // Check if user is a member of the league
+    // Check if user is a member of the league or league is public
     const league = await League.findById(season.league);
-    if (!league || !league.isMember(req.user._id)) {
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isPublic && !league.isMember(req.user._id)) {
       return res.status(403).json({ message: 'You must be a member of this league to view seasons' });
     }
     
@@ -85,7 +98,7 @@ router.post('/', authenticate, [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    // Validate league exists and user is a member
+    // Validate league exists and user is a member (can't create seasons in public leagues you're not a member of)
     const league = await League.findById(req.body.league);
     if (!league) {
       return res.status(404).json({ message: 'League not found' });
@@ -142,9 +155,12 @@ router.put('/:id', authenticate, [
       return res.status(404).json({ message: 'Season not found' });
     }
 
-    // Check if user is a member of the league
+    // Check if user is a member of the league (can't update seasons in leagues you're not a member of)
     const league = await League.findById(season.league);
-    if (!league || !league.isMember(req.user._id)) {
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isMember(req.user._id)) {
       return res.status(403).json({ message: 'You must be a member of this league to update seasons' });
     }
 
@@ -171,9 +187,12 @@ router.post('/:id/generate-schedule', authenticate, async (req, res) => {
       return res.status(404).json({ message: 'Season not found' });
     }
 
-    // Check if user is a member of the league
+    // Check if user is a member of the league (can't generate schedules in leagues you're not a member of)
     const league = await League.findById(season.league);
-    if (!league || !league.isMember(req.user._id)) {
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isMember(req.user._id)) {
       return res.status(403).json({ message: 'You must be a member of this league to generate schedules' });
     }
 
@@ -259,9 +278,12 @@ router.post('/:id/start', authenticate, async (req, res) => {
       return res.status(404).json({ message: 'Season not found' });
     }
 
-    // Check if user is a member of the league
+    // Check if user is a member of the league (can't start seasons in leagues you're not a member of)
     const league = await League.findById(season.league);
-    if (!league || !league.isMember(req.user._id)) {
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isMember(req.user._id)) {
       return res.status(403).json({ message: 'You must be a member of this league to start seasons' });
     }
 
@@ -295,9 +317,12 @@ router.post('/:id/complete', authenticate, async (req, res) => {
       return res.status(404).json({ message: 'Season not found' });
     }
 
-    // Check if user is a member of the league
+    // Check if user is a member of the league (can't complete seasons in leagues you're not a member of)
     const league = await League.findById(season.league);
-    if (!league || !league.isMember(req.user._id)) {
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isMember(req.user._id)) {
       return res.status(403).json({ message: 'You must be a member of this league to complete seasons' });
     }
 
@@ -328,9 +353,12 @@ router.get('/:id/standings', authenticate, async (req, res) => {
       return res.status(404).json({ message: 'Season not found' });
     }
 
-    // Check if user is a member of the league
+    // Check if user is a member of the league or league is public
     const league = await League.findById(season.league);
-    if (!league || !league.isMember(req.user._id)) {
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isPublic && !league.isMember(req.user._id)) {
       return res.status(403).json({ message: 'You must be a member of this league to view standings' });
     }
 
@@ -364,9 +392,12 @@ router.delete('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ message: 'Season not found' });
     }
 
-    // Check if user is a member of the league
+    // Check if user is a member of the league (can't delete seasons in leagues you're not a member of)
     const league = await League.findById(season.league);
-    if (!league || !league.isMember(req.user._id)) {
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isMember(req.user._id)) {
       return res.status(403).json({ message: 'You must be a member of this league to delete seasons' });
     }
 

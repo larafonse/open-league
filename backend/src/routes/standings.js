@@ -5,7 +5,7 @@ const League = require('../models/League');
 const Season = require('../models/Season');
 const authenticate = require('../middleware/auth');
 
-// GET /api/standings - Get standings for leagues user belongs to
+// GET /api/standings - Get standings for leagues user belongs to or public leagues
 router.get('/', authenticate, async (req, res) => {
   try {
     const { league } = req.query;
@@ -19,17 +19,32 @@ router.get('/', authenticate, async (req, res) => {
       ]
     });
 
-    if (userLeagues.length === 0) {
+    // Get all public leagues
+    const publicLeagues = await League.find({ isPublic: true });
+
+    // Combine user leagues and public leagues
+    const allLeagues = [...userLeagues, ...publicLeagues];
+    
+    // Remove duplicates based on _id
+    const uniqueLeagues = allLeagues.filter((league, index, self) =>
+      index === self.findIndex(l => l._id.toString() === league._id.toString())
+    );
+
+    if (uniqueLeagues.length === 0) {
       return res.json([]);
     }
 
-    const leagueIds = userLeagues.map(l => l._id);
+    const leagueIds = uniqueLeagues.map(l => l._id);
     let leagueFilter = { $in: leagueIds };
 
     // If specific league requested, filter to that league
     if (league) {
-      const requestedLeague = userLeagues.find(l => l._id.toString() === league);
+      const requestedLeague = uniqueLeagues.find(l => l._id.toString() === league);
       if (!requestedLeague) {
+        return res.status(403).json({ message: 'You must be a member of this league or it must be public to view standings' });
+      }
+      // Check if league is public or user is a member
+      if (!requestedLeague.isPublic && !requestedLeague.isMember(userId)) {
         return res.status(403).json({ message: 'You must be a member of this league to view standings' });
       }
       leagueFilter = league;

@@ -31,7 +31,7 @@ import type { Standing, League } from '../types';
 const Standings: React.FC = () => {
   const [standings, setStandings] = useState<Standing[]>([]);
   const [leagues, setLeagues] = useState<League[]>([]);
-  const [selectedLeague, setSelectedLeague] = useState<string>('');
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,15 +39,17 @@ const Standings: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchStandings();
-  }, [selectedLeague]);
+    if (selectedLeagueId || leagues.length > 0) {
+      fetchStandings();
+    }
+  }, [selectedLeagueId, leagues]);
 
   const fetchLeagues = async () => {
     try {
       const data = await leaguesApi.getMyLeagues();
       setLeagues(data);
-      if (data.length > 0) {
-        setSelectedLeague(data[0]._id);
+      if (data.length > 0 && !selectedLeagueId) {
+        setSelectedLeagueId(data[0]._id);
       }
     } catch (error) {
       console.error('Error fetching leagues:', error);
@@ -58,7 +60,7 @@ const Standings: React.FC = () => {
     try {
       setLoading(true);
       const data = await standingsApi.getAll({ 
-        league: selectedLeague || undefined 
+        league: selectedLeagueId || undefined 
       });
       setStandings(data);
     } catch (error) {
@@ -103,9 +105,9 @@ const Standings: React.FC = () => {
           <FormControl sx={{ minWidth: 200 }}>
             <InputLabel>Select League</InputLabel>
             <Select
-              value={selectedLeague}
+              value={selectedLeagueId}
               label="Select League"
-              onChange={(e) => setSelectedLeague(e.target.value)}
+              onChange={(e) => setSelectedLeagueId(e.target.value)}
             >
               <MenuItem value="">All My Leagues</MenuItem>
               {leagues.map((league) => (

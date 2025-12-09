@@ -56,6 +56,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
+
 function App() {
   return (
     <ThemeProvider theme={theme}>
@@ -185,8 +186,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
-          </Routes>
-        </Router>
+            </Routes>
+          </Router>
       </AuthProvider>
     </ThemeProvider>
   );

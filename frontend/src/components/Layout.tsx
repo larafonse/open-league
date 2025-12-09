@@ -13,15 +13,9 @@ import {
   useTheme,
   Avatar,
   Divider,
-  IconButton,
 } from '@mui/material';
 import {
   Home,
-  People,
-  Person,
-  CalendarToday,
-  EmojiEvents,
-  SportsSoccer,
   Logout,
   Groups,
 } from '@mui/icons-material';
@@ -46,11 +40,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Leagues', href: '/leagues', icon: Groups },
-    { name: 'Teams', href: '/teams', icon: People },
-    { name: 'Players', href: '/players', icon: Person },
-    { name: 'Games', href: '/games', icon: CalendarToday },
-    { name: 'Seasons', href: '/seasons', icon: SportsSoccer },
-    { name: 'Standings', href: '/standings', icon: EmojiEvents },
   ];
 
   const handleDrawerToggle = () => {
@@ -64,7 +53,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           Arch Suite
         </Typography>
       </Toolbar>
-      <List sx={{ flexGrow: 1 }}>
+
+      <List sx={{ flexGrow: 1, overflow: 'auto' }}>
         {navigation.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.href;
