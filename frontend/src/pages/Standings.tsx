@@ -14,6 +14,10 @@ import {
   TableRow,
   Typography,
   Avatar,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   EmojiEvents,
@@ -21,20 +25,41 @@ import {
   TrendingUp,
   TrendingDown,
 } from '@mui/icons-material';
-import { standingsApi } from '../services/api';
-import type { Standing } from '../types';
+import { standingsApi, leaguesApi } from '../services/api';
+import type { Standing, League } from '../types';
 
 const Standings: React.FC = () => {
   const [standings, setStandings] = useState<Standing[]>([]);
+  const [leagues, setLeagues] = useState<League[]>([]);
+  const [selectedLeague, setSelectedLeague] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchStandings();
+    fetchLeagues();
   }, []);
+
+  useEffect(() => {
+    fetchStandings();
+  }, [selectedLeague]);
+
+  const fetchLeagues = async () => {
+    try {
+      const data = await leaguesApi.getMyLeagues();
+      setLeagues(data);
+      if (data.length > 0) {
+        setSelectedLeague(data[0]._id);
+      }
+    } catch (error) {
+      console.error('Error fetching leagues:', error);
+    }
+  };
 
   const fetchStandings = async () => {
     try {
-      const data = await standingsApi.getAll();
+      setLoading(true);
+      const data = await standingsApi.getAll({ 
+        league: selectedLeague || undefined 
+      });
       setStandings(data);
     } catch (error) {
       console.error('Error fetching standings:', error);
@@ -70,10 +95,27 @@ const Standings: React.FC = () => {
 
   return (
     <Container maxWidth="xl">
-      <Box mb={4}>
+      <Box mb={4} display="flex" justifyContent="space-between" alignItems="center">
         <Typography variant="h3" component="h1" gutterBottom>
           League Standings
         </Typography>
+        {leagues.length > 0 && (
+          <FormControl sx={{ minWidth: 200 }}>
+            <InputLabel>Select League</InputLabel>
+            <Select
+              value={selectedLeague}
+              label="Select League"
+              onChange={(e) => setSelectedLeague(e.target.value)}
+            >
+              <MenuItem value="">All My Leagues</MenuItem>
+              {leagues.map((league) => (
+                <MenuItem key={league._id} value={league._id}>
+                  {league.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
       </Box>
 
       {standings.length > 0 ? (

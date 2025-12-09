@@ -4,8 +4,12 @@ const seasonSchema = new mongoose.Schema({
   name: {
     type: String,
     required: [true, 'Season name is required'],
-    trim: true,
-    unique: true
+    trim: true
+  },
+  league: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'League',
+    required: [true, 'League is required']
   },
   description: {
     type: String,

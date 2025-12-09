@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Team, Player, Game, Standing, Season, CreateTeamData, CreatePlayerData, CreateGameData, CreateSeasonData } from '../types';
+import type { Team, Player, Game, Standing, Season, League, CreateTeamData, CreatePlayerData, CreateGameData, CreateSeasonData, CreateLeagueData } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -9,6 +9,36 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Add token to requests if available
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Handle token expiration
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid, clear it
+      localStorage.removeItem('token');
+      // Optionally redirect to login
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Teams API
 export const teamsApi = {
@@ -51,8 +81,31 @@ export const gamesApi = {
 
 // Standings API
 export const standingsApi = {
-  getAll: (): Promise<Standing[]> => api.get('/standings').then(res => res.data),
+  getAll: (params?: { league?: string }): Promise<Standing[]> => 
+    api.get('/standings', { params }).then(res => res.data),
   getByTeam: (teamId: string): Promise<Standing> => api.get(`/standings/${teamId}`).then(res => res.data),
+};
+
+// Leagues API
+export const leaguesApi = {
+  getAll: (params?: { search?: string; publicOnly?: boolean }): Promise<League[]> => 
+    api.get('/leagues', { params }).then(res => res.data),
+  getMyLeagues: (): Promise<League[]> => 
+    api.get('/leagues/my-leagues').then(res => res.data),
+  getById: (id: string): Promise<League> => 
+    api.get(`/leagues/${id}`).then(res => res.data),
+  create: (data: CreateLeagueData): Promise<League> => 
+    api.post('/leagues', data).then(res => res.data),
+  update: (id: string, data: Partial<CreateLeagueData>): Promise<League> => 
+    api.put(`/leagues/${id}`, data).then(res => res.data),
+  delete: (id: string): Promise<void> => 
+    api.delete(`/leagues/${id}`).then(() => undefined),
+  addMember: (leagueId: string, userId: string): Promise<League> => 
+    api.post(`/leagues/${leagueId}/members`, { userId }).then(res => res.data),
+  removeMember: (leagueId: string, userId: string): Promise<League> => 
+    api.delete(`/leagues/${leagueId}/members/${userId}`).then(res => res.data),
+  getSeasons: (leagueId: string): Promise<Season[]> => 
+    api.get(`/leagues/${leagueId}/seasons`).then(res => res.data),
 };
 
 // Seasons API
@@ -72,6 +125,34 @@ export const seasonsApi = {
     api.post(`/seasons/${id}/complete`).then(res => res.data),
   getStandings: (id: string): Promise<any[]> => 
     api.get(`/seasons/${id}/standings`).then(res => res.data),
+};
+
+// Auth API
+export interface LoginResponse {
+  token: string;
+  user: {
+    _id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+  };
+}
+
+export interface SignupResponse extends LoginResponse {}
+
+export const authApi = {
+  login: (email: string, password: string): Promise<LoginResponse> =>
+    api.post('/auth/login', { email, password }).then(res => res.data),
+  signup: (email: string, password: string, firstName: string, lastName: string): Promise<SignupResponse> =>
+    api.post('/auth/signup', { email, password, firstName, lastName }).then(res => res.data),
+  getCurrentUser: (): Promise<{
+    _id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+  }> => api.get('/auth/me').then(res => res.data.user),
 };
 
 export default api;

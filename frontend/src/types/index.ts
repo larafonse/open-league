@@ -217,6 +217,7 @@ export interface SeasonStanding {
 }
 
 export interface Season extends BaseSeason {
+  league: BaseLeague | string;
   weeks: SeasonWeek[];
   standings: SeasonStanding[];
 }
@@ -224,6 +225,7 @@ export interface Season extends BaseSeason {
 export interface CreateSeasonData {
   name: string;
   description?: string;
+  league: string;
   startDate: string;
   endDate: string;
   teams: string[];
@@ -231,5 +233,48 @@ export interface CreateSeasonData {
     gamesPerWeek?: number;
     playoffTeams?: number;
     regularSeasonWeeks?: number;
+  };
+}
+
+// League interfaces
+export interface BaseLeague {
+  _id: string;
+  name: string;
+  description?: string;
+  owner: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  members: Array<{
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  }>;
+  isPublic: boolean;
+  settings: {
+    maxTeams: number;
+    minTeams: number;
+  };
+  memberCount: number;
+  isMember: boolean;
+  isOwner: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface League extends BaseLeague {
+  // Can be extended with populated data if needed
+}
+
+export interface CreateLeagueData {
+  name: string;
+  description?: string;
+  isPublic?: boolean;
+  settings?: {
+    maxTeams?: number;
+    minTeams?: number;
   };
 }

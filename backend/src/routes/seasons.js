@@ -4,16 +4,32 @@ const { body, validationResult } = require('express-validator');
 const Season = require('../models/Season');
 const Team = require('../models/Team');
 const Game = require('../models/Game');
+const League = require('../models/League');
+const authenticate = require('../middleware/auth');
 
-// GET /api/seasons - Get all seasons
-router.get('/', async (req, res) => {
+// GET /api/seasons - Get all seasons (filtered by user's leagues)
+router.get('/', authenticate, async (req, res) => {
   try {
-    const { status } = req.query;
-    let query = {};
+    const { status, league } = req.query;
+    const userId = req.user._id;
+
+    // Get leagues user belongs to
+    const userLeagues = await League.find({
+      $or: [
+        { owner: userId },
+        { members: userId }
+      ]
+    }).select('_id');
+
+    const leagueIds = userLeagues.map(l => l._id);
+
+    let query = { league: { $in: leagueIds } };
 
     if (status) query.status = status;
+    if (league) query.league = league;
 
     const seasons = await Season.find(query)
+      .populate('league', 'name')
       .populate('teams', 'name city colors')
       .populate('standings.team', 'name city colors')
       .sort({ createdAt: -1 });
@@ -25,9 +41,10 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/seasons/:id - Get season by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
   try {
     const season = await Season.findById(req.params.id)
+      .populate('league', 'name owner members')
       .populate('teams', 'name city colors')
       .populate('standings.team', 'name city colors')
       .populate({
@@ -41,6 +58,12 @@ router.get('/:id', async (req, res) => {
     if (!season) {
       return res.status(404).json({ message: 'Season not found' });
     }
+
+    // Check if user is a member of the league
+    const league = await League.findById(season.league);
+    if (!league || !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to view seasons' });
+    }
     
     res.json(season);
   } catch (error) {
@@ -49,8 +72,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/seasons - Create new season
-router.post('/', [
+router.post('/', authenticate, [
   body('name').notEmpty().withMessage('Season name is required'),
+  body('league').notEmpty().withMessage('League is required'),
   body('startDate').isISO8601().withMessage('Valid start date is required'),
   body('endDate').isISO8601().withMessage('Valid end date is required'),
   body('teams').isArray({ min: 2 }).withMessage('At least 2 teams are required')
@@ -59,6 +83,15 @@ router.post('/', [
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
+    }
+
+    // Validate league exists and user is a member
+    const league = await League.findById(req.body.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to create seasons' });
     }
 
     // Validate dates
@@ -79,21 +112,18 @@ router.post('/', [
     await season.save();
     
     const populatedSeason = await Season.findById(season._id)
+      .populate('league', 'name')
       .populate('teams', 'name city colors')
       .populate('standings.team', 'name city colors');
     
     res.status(201).json(populatedSeason);
   } catch (error) {
-    if (error.code === 11000) {
-      res.status(400).json({ message: 'Season name already exists' });
-    } else {
-      res.status(500).json({ message: 'Error creating season', error: error.message });
-    }
+    res.status(500).json({ message: 'Error creating season', error: error.message });
   }
 });
 
 // PUT /api/seasons/:id - Update season
-router.put('/:id', [
+router.put('/:id', authenticate, [
   body('name').optional().notEmpty().withMessage('Season name cannot be empty'),
   body('startDate').optional().isISO8601().withMessage('Valid start date is required'),
   body('endDate').optional().isISO8601().withMessage('Valid end date is required'),
@@ -106,37 +136,45 @@ router.put('/:id', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const season = await Season.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
+    const season = await Season.findById(req.params.id);
     
     if (!season) {
       return res.status(404).json({ message: 'Season not found' });
     }
+
+    // Check if user is a member of the league
+    const league = await League.findById(season.league);
+    if (!league || !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to update seasons' });
+    }
+
+    Object.assign(season, req.body);
+    await season.save();
     
     const populatedSeason = await Season.findById(season._id)
+      .populate('league', 'name')
       .populate('teams', 'name city colors')
       .populate('standings.team', 'name city colors');
     
     res.json(populatedSeason);
   } catch (error) {
-    if (error.code === 11000) {
-      res.status(400).json({ message: 'Season name already exists' });
-    } else {
-      res.status(500).json({ message: 'Error updating season', error: error.message });
-    }
+    res.status(500).json({ message: 'Error updating season', error: error.message });
   }
 });
 
 // POST /api/seasons/:id/generate-schedule - Generate season schedule
-router.post('/:id/generate-schedule', async (req, res) => {
+router.post('/:id/generate-schedule', authenticate, async (req, res) => {
   try {
     const season = await Season.findById(req.params.id);
     
     if (!season) {
       return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user is a member of the league
+    const league = await League.findById(season.league);
+    if (!league || !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to generate schedules' });
     }
 
     if (season.status !== 'draft') {
@@ -213,12 +251,18 @@ router.post('/:id/generate-schedule', async (req, res) => {
 });
 
 // POST /api/seasons/:id/start - Start the season
-router.post('/:id/start', async (req, res) => {
+router.post('/:id/start', authenticate, async (req, res) => {
   try {
     const season = await Season.findById(req.params.id);
     
     if (!season) {
       return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user is a member of the league
+    const league = await League.findById(season.league);
+    if (!league || !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to start seasons' });
     }
 
     if (season.status !== 'draft') {
@@ -243,12 +287,18 @@ router.post('/:id/start', async (req, res) => {
 });
 
 // POST /api/seasons/:id/complete - Complete the season
-router.post('/:id/complete', async (req, res) => {
+router.post('/:id/complete', authenticate, async (req, res) => {
   try {
     const season = await Season.findById(req.params.id);
     
     if (!season) {
       return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user is a member of the league
+    const league = await League.findById(season.league);
+    if (!league || !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to complete seasons' });
     }
 
     if (season.status !== 'active') {
@@ -269,13 +319,19 @@ router.post('/:id/complete', async (req, res) => {
 });
 
 // GET /api/seasons/:id/standings - Get season standings
-router.get('/:id/standings', async (req, res) => {
+router.get('/:id/standings', authenticate, async (req, res) => {
   try {
     const season = await Season.findById(req.params.id)
       .populate('standings.team', 'name city colors');
     
     if (!season) {
       return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user is a member of the league
+    const league = await League.findById(season.league);
+    if (!league || !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to view standings' });
     }
 
     // Sort standings by points (desc), then by point differential (desc), then by wins (desc)
@@ -300,12 +356,18 @@ router.get('/:id/standings', async (req, res) => {
 });
 
 // DELETE /api/seasons/:id - Delete season
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, async (req, res) => {
   try {
     const season = await Season.findById(req.params.id);
     
     if (!season) {
       return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user is a member of the league
+    const league = await League.findById(season.league);
+    if (!league || !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to delete seasons' });
     }
 
     if (season.status === 'active') {
