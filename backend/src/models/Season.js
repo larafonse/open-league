@@ -53,7 +53,7 @@ const seasonSchema = new mongoose.Schema({
   }],
   status: {
     type: String,
-    enum: ['draft', 'active', 'completed', 'cancelled'],
+    enum: ['draft', 'registration', 'active', 'completed', 'cancelled'],
     default: 'draft'
   },
   settings: {
@@ -114,17 +114,17 @@ const seasonSchema = new mongoose.Schema({
 
 // Virtual for total weeks
 seasonSchema.virtual('totalWeeks').get(function() {
-  return this.weeks.length;
+  return this.weeks ? this.weeks.length : 0;
 });
 
 // Virtual for completed weeks
 seasonSchema.virtual('completedWeeks').get(function() {
-  return this.weeks.filter(week => week.isCompleted).length;
+  return this.weeks ? this.weeks.filter(week => week.isCompleted).length : 0;
 });
 
 // Virtual for progress percentage
 seasonSchema.virtual('progressPercentage').get(function() {
-  if (this.weeks.length === 0) return 0;
+  if (!this.weeks || this.weeks.length === 0) return 0;
   return Math.round((this.completedWeeks / this.totalWeeks) * 100);
 });
 
@@ -152,7 +152,7 @@ seasonSchema.pre('save', function(next) {
 
 // Method to generate season schedule
 seasonSchema.methods.generateSchedule = function() {
-  const teams = this.teams;
+  const teams = this.teams || [];
   const totalTeams = teams.length;
   
   if (totalTeams < 2) {

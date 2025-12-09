@@ -290,5 +290,104 @@ router.get('/:id/seasons', authenticate, async (req, res) => {
   }
 });
 
+// POST /api/leagues/:id/teams - Add teams to a league
+router.post('/:id/teams', authenticate, [
+  body('teamIds').isArray().withMessage('teamIds must be an array'),
+  body('teamIds.*').isMongoId().withMessage('Each team ID must be a valid MongoDB ID')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const league = await League.findById(req.params.id);
+
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+
+    // Only owner can add teams
+    if (league.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only the league owner can add teams' });
+    }
+
+    const { teamIds } = req.body;
+    const Team = require('../models/Team');
+
+    // Verify all teams exist
+    const teams = await Team.find({ _id: { $in: teamIds } });
+    if (teams.length !== teamIds.length) {
+      return res.status(400).json({ message: 'One or more teams not found' });
+    }
+
+    // Add teams to league (avoid duplicates)
+    teamIds.forEach(teamId => {
+      if (!league.teams.some(t => t.toString() === teamId)) {
+        league.teams.push(teamId);
+      }
+    });
+
+    await league.save();
+    await league.populate('owner', 'firstName lastName email');
+    await league.populate('members', 'firstName lastName email');
+
+    const leagueObj = league.toObject();
+    leagueObj.isMember = true;
+    leagueObj.isOwner = true;
+
+    res.json(leagueObj);
+  } catch (error) {
+    res.status(500).json({ message: 'Error adding teams to league', error: error.message });
+  }
+});
+
+// GET /api/leagues/:id/teams - Get teams for a league
+router.get('/:id/teams', authenticate, async (req, res) => {
+  try {
+    const league = await League.findById(req.params.id);
+
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+
+    // Allow access if league is public OR user is a member
+    if (!league.isPublic && !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to view teams' });
+    }
+
+    // Get all seasons for this league
+    const seasons = await Season.find({ league: league._id }).select('teams');
+    
+    // Collect all unique team IDs from seasons
+    const teamIds = new Set();
+    seasons.forEach(season => {
+      if (season.teams && Array.isArray(season.teams)) {
+        season.teams.forEach(teamId => {
+          teamIds.add(teamId.toString());
+        });
+      }
+    });
+
+    // Also add teams directly associated with the league
+    if (league.teams && Array.isArray(league.teams)) {
+      league.teams.forEach(teamId => {
+        teamIds.add(teamId.toString());
+      });
+    }
+
+    // Get all unique teams
+    const Team = require('../models/Team');
+    const teams = await Team.find({ _id: { $in: Array.from(teamIds) } })
+      .populate('players', 'firstName lastName position jerseyNumber')
+      .populate('captain', 'firstName lastName')
+      .sort({ name: 1 });
+
+    res.json(teams);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching teams', error: error.message });
+  }
+});
+
 module.exports = router;
 

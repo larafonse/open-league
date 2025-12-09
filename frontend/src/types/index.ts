@@ -182,7 +182,7 @@ export interface BaseSeason {
   endDate: string;
   teams: BaseTeam[];
   weeks: SeasonWeek[];
-  status: 'draft' | 'active' | 'completed' | 'cancelled';
+  status: 'draft' | 'registration' | 'active' | 'completed' | 'cancelled';
   settings: {
     gamesPerWeek: number;
     playoffTeams: number;

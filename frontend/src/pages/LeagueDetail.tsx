@@ -34,13 +34,14 @@ import {
   CalendarToday,
 } from '@mui/icons-material';
 import { leaguesApi } from '../services/api';
-import type { League, Season } from '../types';
+import type { League, Season, Team } from '../types';
 
 const LeagueDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [league, setLeague] = useState<League | null>(null);
   const [seasons, setSeasons] = useState<Season[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -55,6 +56,7 @@ const LeagueDetail: React.FC = () => {
     if (id) {
       fetchLeague();
       fetchSeasons();
+      fetchTeams();
     }
   }, [id]);
 
@@ -82,6 +84,17 @@ const LeagueDetail: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching seasons:', error);
+    }
+  };
+
+  const fetchTeams = async () => {
+    try {
+      if (id) {
+        const data = await leaguesApi.getTeams(id);
+        setTeams(data);
+      }
+    } catch (error) {
+      console.error('Error fetching teams:', error);
     }
   };
 
@@ -200,6 +213,7 @@ const LeagueDetail: React.FC = () => {
       <Card sx={{ mb: 3 }}>
         <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
           <Tab label="Overview" />
+          <Tab label="Teams" />
           <Tab label="Seasons" />
           <Tab label="Members" />
         </Tabs>
@@ -298,6 +312,95 @@ const LeagueDetail: React.FC = () => {
         <Card>
           <CardContent>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">Teams ({teams.length})</Typography>
+              {league.isOwner && (
+                <Button
+                  variant="contained"
+                  startIcon={<Add />}
+                  component={Link}
+                  to="/teams"
+                >
+                  Add Team
+                </Button>
+              )}
+            </Box>
+            {teams.length === 0 ? (
+              <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
+                No teams in this league yet. Teams are added when you create seasons.
+              </Typography>
+            ) : (
+              <Grid container spacing={2}>
+                {teams.map((team) => (
+                  <Grid size={{ xs: 12, sm: 6, md: 4 }} key={team._id}>
+                    <Card
+                      component={Link}
+                      to={`/teams/${team._id}`}
+                      sx={{ 
+                        textDecoration: 'none', 
+                        height: '100%', 
+                        '&:hover': { boxShadow: 3 },
+                        borderLeft: `4px solid ${team.colors.primary}`
+                      }}
+                    >
+                      <CardContent>
+                        <Box display="flex" alignItems="center" gap={2} mb={1}>
+                          <Box
+                            sx={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: '50%',
+                              backgroundColor: team.colors.primary,
+                              border: `2px solid ${team.colors.secondary}`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: team.colors.secondary,
+                              fontWeight: 'bold',
+                              fontSize: '1.2rem'
+                            }}
+                          >
+                            {team.name.charAt(0)}
+                          </Box>
+                          <Box flex={1}>
+                            <Typography variant="h6" gutterBottom>
+                              {team.name}
+                            </Typography>
+                            <Typography variant="body2" color="textSecondary">
+                              {team.city}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box mt={2}>
+                          <Typography variant="body2" color="textSecondary">
+                            Players: {Array.isArray(team.players) ? team.players.length : 0}
+                          </Typography>
+                          {team.captain && (
+                            <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+                              Captain: {team.captain.firstName} {team.captain.lastName}
+                            </Typography>
+                          )}
+                          {(team.wins > 0 || team.losses > 0 || team.ties > 0) && (
+                            <Box mt={1}>
+                              <Typography variant="caption" color="textSecondary">
+                                Record: {team.wins}-{team.losses}-{team.ties}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tabValue === 2 && (
+        <Card>
+          <CardContent>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="h6">Seasons</Typography>
               {league.isOwner && (
                 <Button
@@ -363,7 +466,7 @@ const LeagueDetail: React.FC = () => {
         </Card>
       )}
 
-      {tabValue === 2 && (
+      {tabValue === 3 && (
         <Card>
           <CardContent>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>

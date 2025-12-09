@@ -14,13 +14,10 @@ import {
   Typography,
   Avatar,
   Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
 } from '@mui/material';
 import {
   Add,
@@ -48,13 +45,13 @@ const Teams: React.FC = () => {
   });
 
   useEffect(() => {
-    fetchTeams();
+    fetchData();
   }, []);
 
-  const fetchTeams = async () => {
+  const fetchData = async () => {
     try {
-      const data = await teamsApi.getAll();
-      setTeams(data);
+      const teamsData = await teamsApi.getAll();
+      setTeams(teamsData);
     } catch (error) {
       console.error('Error fetching teams:', error);
     } finally {
@@ -81,17 +78,18 @@ const Teams: React.FC = () => {
         founded: '',
         coach: ''
       });
-      fetchTeams();
+      fetchData();
     } catch (error) {
       console.error('Error creating team:', error);
     }
   };
 
+
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this team?')) {
       try {
         await teamsApi.delete(id);
-        fetchTeams();
+        fetchData();
       } catch (error) {
         console.error('Error deleting team:', error);
       }
@@ -207,92 +205,105 @@ const Teams: React.FC = () => {
         </form>
       </Dialog>
 
-      {/* Teams Table */}
+      {/* Teams Grid */}
       {teams.length > 0 ? (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Team</TableCell>
-                <TableCell>City</TableCell>
-                <TableCell>Coach</TableCell>
-                <TableCell>Founded</TableCell>
-                <TableCell>Record</TableCell>
-                <TableCell>Win %</TableCell>
-                <TableCell>Players</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {teams.map((team) => (
-                <TableRow key={team._id} hover>
-                  <TableCell>
-                    <Box display="flex" alignItems="center">
-                      <Avatar
-                        sx={{
-                          bgcolor: team.colors.primary,
-                          color: team.colors.secondary,
-                          mr: 2,
-                          width: 40,
-                          height: 40,
-                        }}
-                      >
-                        {team.name.charAt(0)}
-                      </Avatar>
-                      <Typography variant="subtitle1" fontWeight="medium">
+        <Grid container spacing={3}>
+          {teams.map((team) => (
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={team._id}>
+              <Card
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  borderLeft: `4px solid ${team.colors.primary}`,
+                }}
+              >
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Box display="flex" alignItems="center" mb={2}>
+                    <Avatar
+                      sx={{
+                        bgcolor: team.colors.primary,
+                        color: team.colors.secondary,
+                        width: 56,
+                        height: 56,
+                        mr: 2,
+                        fontSize: '1.5rem',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      {team.name.charAt(0)}
+                    </Avatar>
+                    <Box flex={1}>
+                      <Typography variant="h6" component="h2" gutterBottom>
                         {team.name}
                       </Typography>
+                      <Box display="flex" alignItems="center" color="text.secondary">
+                        <LocationOn fontSize="small" sx={{ mr: 0.5 }} />
+                        <Typography variant="body2">{team.city}</Typography>
+                      </Box>
                     </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box display="flex" alignItems="center">
-                      <LocationOn fontSize="small" color="action" sx={{ mr: 0.5 }} />
-                      {team.city}
-                    </Box>
-                  </TableCell>
-                  <TableCell>{team.coach || '-'}</TableCell>
-                  <TableCell>{team.founded || '-'}</TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={`${team.wins}-${team.losses}-${team.ties}`} 
-                      size="small" 
-                      color="primary" 
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight="medium">
-                      {(team.winPercentage * 100).toFixed(1)}%
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {team.players.length}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Box display="flex" gap={1}>
-                      <IconButton
-                        component={Link}
-                        to={`/teams/${team._id}`}
-                        size="small"
-                        color="primary"
-                      >
-                        <Edit />
-                      </IconButton>
-                      <IconButton
-                        onClick={() => handleDelete(team._id)}
-                        size="small"
-                        color="error"
-                      >
-                        <Delete />
-                      </IconButton>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                  </Box>
+
+                  <Box mb={2}>
+                    <Grid container spacing={1}>
+                      <Grid size={{ xs: 6 }}>
+                        <Typography variant="caption" color="textSecondary">
+                          Record
+                        </Typography>
+                        <Typography variant="body2" fontWeight="medium">
+                          {team.wins}-{team.losses}-{team.ties}
+                        </Typography>
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
+                        <Typography variant="caption" color="textSecondary">
+                          Win %
+                        </Typography>
+                        <Typography variant="body2" fontWeight="medium">
+                          {(team.winPercentage * 100).toFixed(1)}%
+                        </Typography>
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
+                        <Typography variant="caption" color="textSecondary">
+                          Players
+                        </Typography>
+                        <Typography variant="body2" fontWeight="medium">
+                          {Array.isArray(team.players) ? team.players.length : 0}
+                        </Typography>
+                      </Grid>
+                      {team.coach && (
+                        <Grid size={{ xs: 6 }}>
+                          <Typography variant="caption" color="textSecondary">
+                            Coach
+                          </Typography>
+                          <Typography variant="body2" fontWeight="medium">
+                            {team.coach}
+                          </Typography>
+                        </Grid>
+                      )}
+                    </Grid>
+                  </Box>
+                </CardContent>
+                <CardActions sx={{ justifyContent: 'flex-end', px: 2, pb: 2 }}>
+                  <IconButton
+                    component={Link}
+                    to={`/teams/${team._id}`}
+                    size="small"
+                    color="primary"
+                  >
+                    <Edit />
+                  </IconButton>
+                  <IconButton
+                    onClick={() => handleDelete(team._id)}
+                    size="small"
+                    color="error"
+                  >
+                    <Delete />
+                  </IconButton>
+                </CardActions>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
       ) : (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <People sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
@@ -311,6 +322,7 @@ const Teams: React.FC = () => {
           </Button>
         </Paper>
       )}
+
     </Container>
   );
 };

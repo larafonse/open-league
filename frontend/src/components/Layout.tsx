@@ -18,6 +18,7 @@ import {
   Home,
   Logout,
   Groups,
+  People,
 } from '@mui/icons-material';
 import { useAuth } from '../hooks/useAuth';
 
@@ -40,6 +41,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Leagues', href: '/leagues', icon: Groups },
+    { name: 'Teams', href: '/teams', icon: People },
   ];
 
   const handleDrawerToggle = () => {

@@ -33,6 +33,11 @@ router.get('/', authenticate, async (req, res) => {
     // Remove duplicates
     const uniqueLeagueIds = [...new Set(allLeagueIds.map(id => id.toString()))];
 
+    // If no leagues found, return empty array
+    if (uniqueLeagueIds.length === 0) {
+      return res.json([]);
+    }
+
     let query = { league: { $in: uniqueLeagueIds } };
 
     if (status) query.status = status;
@@ -44,8 +49,97 @@ router.get('/', authenticate, async (req, res) => {
       .populate('standings.team', 'name city colors')
       .sort({ createdAt: -1 });
     
-    res.json(seasons);
+    // Ensure teams and standings arrays exist and handle virtuals safely
+    const safeSeasons = seasons.map(season => {
+      try {
+        // Get the raw season data first without virtuals to avoid issues
+        const seasonData = season.toObject ? season.toObject({ virtuals: false }) : (season || {});
+        
+        // Ensure seasonData exists and has required fields
+        if (!seasonData || typeof seasonData !== 'object') {
+          throw new Error('Invalid season data');
+        }
+        
+        // Ensure all arrays exist before accessing them
+        const teams = Array.isArray(seasonData.teams) ? seasonData.teams : (season.teams ? (Array.isArray(season.teams) ? season.teams : []) : []);
+        const standings = Array.isArray(seasonData.standings) ? seasonData.standings : (season.standings ? (Array.isArray(season.standings) ? season.standings : []) : []);
+        const weeks = Array.isArray(seasonData.weeks) ? seasonData.weeks : (season.weeks ? (Array.isArray(season.weeks) ? season.weeks : []) : []);
+        
+        // Build safe season object
+        const safeSeason = {
+          ...seasonData,
+          teams: teams,
+          standings: standings,
+          weeks: weeks,
+        };
+        
+        // Ensure standings array items have team field
+        if (Array.isArray(safeSeason.standings)) {
+          safeSeason.standings = safeSeason.standings.map((standing) => {
+            if (!standing || typeof standing !== 'object') {
+              return { team: null, gamesPlayed: 0, wins: 0, losses: 0, ties: 0, points: 0 };
+            }
+            if (!standing.team) standing.team = null;
+            return standing;
+          });
+        }
+        
+        // Safely calculate virtuals manually
+        const weeksArray = safeSeason.weeks || [];
+        safeSeason.totalWeeks = Array.isArray(weeksArray) ? weeksArray.length : 0;
+        safeSeason.completedWeeks = Array.isArray(weeksArray) 
+          ? weeksArray.filter(w => w && typeof w === 'object' && w.isCompleted === true).length 
+          : 0;
+        safeSeason.progressPercentage = safeSeason.totalWeeks > 0 
+          ? Math.round((safeSeason.completedWeeks / safeSeason.totalWeeks) * 100) 
+          : 0;
+        
+        // Calculate isActive
+        if (safeSeason.status === 'active' && safeSeason.startDate && safeSeason.endDate) {
+          try {
+            const now = new Date();
+            const startDate = new Date(safeSeason.startDate);
+            const endDate = new Date(safeSeason.endDate);
+            safeSeason.isActive = now >= startDate && now <= endDate;
+          } catch (dateError) {
+            safeSeason.isActive = false;
+          }
+        } else {
+          safeSeason.isActive = false;
+        }
+        
+        // Ensure league is populated
+        if (!safeSeason.league) {
+          safeSeason.league = season.league || null;
+        }
+        
+        return safeSeason;
+      } catch (error) {
+        console.error('Error processing season:', season?._id || season?.id, error.message, error.stack);
+        // Return a safe default object
+        return {
+          _id: season?._id || season?.id || 'unknown',
+          name: season?.name || 'Unknown',
+          description: season?.description || '',
+          teams: [],
+          standings: [],
+          weeks: [],
+          totalWeeks: 0,
+          completedWeeks: 0,
+          progressPercentage: 0,
+          isActive: false,
+          status: season?.status || 'draft',
+          startDate: season?.startDate || new Date(),
+          endDate: season?.endDate || new Date(),
+          league: season?.league || null,
+          settings: season?.settings || {},
+        };
+      }
+    });
+    
+    res.json(safeSeasons);
   } catch (error) {
+    console.error('Error in GET /api/seasons:', error);
     res.status(500).json({ message: 'Error fetching seasons', error: error.message });
   }
 });
@@ -200,7 +294,7 @@ router.post('/:id/generate-schedule', authenticate, async (req, res) => {
       return res.status(400).json({ message: 'Can only generate schedule for draft seasons' });
     }
 
-    if (season.teams.length < 2) {
+    if (!season.teams || season.teams.length < 2) {
       return res.status(400).json({ message: 'At least 2 teams are required to generate schedule' });
     }
 
@@ -249,7 +343,7 @@ router.post('/:id/generate-schedule', authenticate, async (req, res) => {
     await season.save();
     
     // Log the created games for debugging
-    const totalGames = season.weeks.reduce((total, week) => total + week.games.length, 0);
+    const totalGames = season.weeks.reduce((total, week) => total + (week.games?.length || 0), 0);
     console.log(`Created ${totalGames} games for season ${season.name}`);
     
     const populatedSeason = await Season.findById(season._id)
@@ -291,7 +385,7 @@ router.post('/:id/start', authenticate, async (req, res) => {
       return res.status(400).json({ message: 'Can only start draft seasons' });
     }
 
-    if (season.weeks.length === 0) {
+    if (!season.weeks || season.weeks.length === 0) {
       return res.status(400).json({ message: 'Must generate schedule before starting season' });
     }
 
@@ -413,6 +507,107 @@ router.delete('/:id', authenticate, async (req, res) => {
     res.json({ message: 'Season deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting season', error: error.message });
+  }
+});
+
+// POST /api/seasons/:id/open-registration - Open season for team registration
+router.post('/:id/open-registration', authenticate, async (req, res) => {
+  try {
+    const season = await Season.findById(req.params.id);
+
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user is a member of the league
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to open registration' });
+    }
+
+    if (season.status !== 'draft') {
+      return res.status(400).json({ message: 'Can only open registration for draft seasons' });
+    }
+
+    season.status = 'registration';
+    await season.save();
+
+    const populatedSeason = await Season.findById(season._id)
+      .populate('league', 'name')
+      .populate('teams', 'name city colors')
+      .populate('standings.team', 'name city colors');
+
+    res.json(populatedSeason);
+  } catch (error) {
+    res.status(500).json({ message: 'Error opening registration', error: error.message });
+  }
+});
+
+// POST /api/seasons/:id/register-team - Register a team for a season
+router.post('/:id/register-team', authenticate, [
+  body('teamId').isMongoId().withMessage('Valid team ID is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const season = await Season.findById(req.params.id);
+
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if season is open for registration
+    if (season.status !== 'registration') {
+      return res.status(400).json({ message: 'Season is not open for registration' });
+    }
+
+    // Check if user has access to the league (public or member)
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isPublic && !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to register teams' });
+    }
+
+    const { teamId } = req.body;
+
+    // Verify team exists
+    const team = await Team.findById(teamId);
+    if (!team) {
+      return res.status(404).json({ message: 'Team not found' });
+    }
+
+    // Check if team is already registered
+    const teamIds = (season.teams || []).map((t) => {
+      if (typeof t === 'string') return t;
+      if (t && t.toString) return t.toString();
+      if (t && t._id) return t._id.toString();
+      return t;
+    });
+    if (teamIds.includes(teamId)) {
+      return res.status(400).json({ message: 'Team is already registered for this season' });
+    }
+
+    // Add team to season
+    season.teams = season.teams || [];
+    season.teams.push(teamId);
+    await season.save();
+
+    const populatedSeason = await Season.findById(season._id)
+      .populate('league', 'name')
+      .populate('teams', 'name city colors')
+      .populate('standings.team', 'name city colors');
+
+    res.json(populatedSeason);
+  } catch (error) {
+    res.status(500).json({ message: 'Error registering team', error: error.message });
   }
 });
 

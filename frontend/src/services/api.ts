@@ -106,6 +106,10 @@ export const leaguesApi = {
     api.delete(`/leagues/${leagueId}/members/${userId}`).then(res => res.data),
   getSeasons: (leagueId: string): Promise<Season[]> => 
     api.get(`/leagues/${leagueId}/seasons`).then(res => res.data),
+  getTeams: (leagueId: string): Promise<Team[]> => 
+    api.get(`/leagues/${leagueId}/teams`).then(res => res.data),
+  addTeams: (leagueId: string, teamIds: string[]): Promise<League> => 
+    api.post(`/leagues/${leagueId}/teams`, { teamIds }).then(res => res.data),
 };
 
 // Seasons API
@@ -123,6 +127,10 @@ export const seasonsApi = {
     api.post(`/seasons/${id}/start`).then(res => res.data),
   complete: (id: string): Promise<Season> => 
     api.post(`/seasons/${id}/complete`).then(res => res.data),
+  openRegistration: (id: string): Promise<Season> => 
+    api.post(`/seasons/${id}/open-registration`).then(res => res.data),
+  registerTeam: (id: string, teamId: string): Promise<Season> => 
+    api.post(`/seasons/${id}/register-team`, { teamId }).then(res => res.data),
   getStandings: (id: string): Promise<any[]> => 
     api.get(`/seasons/${id}/standings`).then(res => res.data),
 };

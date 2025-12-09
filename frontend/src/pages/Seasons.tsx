@@ -31,7 +31,9 @@ import {
   Schedule,
   Delete,
   Visibility,
-  SportsSoccer
+  SportsSoccer,
+  PersonAdd,
+  HowToReg
 } from '@mui/icons-material';
 import { seasonsApi, teamsApi } from '../services/api';
 import type { Season, Team, CreateSeasonData } from '../types';
@@ -137,11 +139,30 @@ const Seasons: React.FC = () => {
     }
   };
 
+  const handleOpenRegistration = async (id: string) => {
+    try {
+      await seasonsApi.openRegistration(id);
+      fetchData();
+    } catch (error) {
+      console.error('Error opening registration:', error);
+    }
+  };
+
+  const handleRegisterTeam = async (seasonId: string, teamId: string) => {
+    try {
+      await seasonsApi.registerTeam(seasonId, teamId);
+      fetchData();
+    } catch (error) {
+      console.error('Error registering team:', error);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'success';
       case 'completed': return 'info';
       case 'draft': return 'warning';
+      case 'registration': return 'primary';
       case 'cancelled': return 'error';
       default: return 'default';
     }
@@ -373,7 +394,17 @@ const Seasons: React.FC = () => {
                       >
                         <Visibility />
                       </IconButton>
-                      {season.status === 'draft' && season.weeks.length === 0 && (
+                      {season.status === 'draft' && (
+                        <IconButton
+                          onClick={() => handleOpenRegistration(season._id)}
+                          size="small"
+                          color="primary"
+                          title="Open Registration"
+                        >
+                          <PersonAdd />
+                        </IconButton>
+                      )}
+                      {season.status === 'registration' && season.weeks.length === 0 && (
                         <IconButton
                           onClick={() => handleGenerateSchedule(season._id)}
                           size="small"
@@ -381,6 +412,16 @@ const Seasons: React.FC = () => {
                           title="Generate Schedule"
                         >
                           <Schedule />
+                        </IconButton>
+                      )}
+                      {season.status === 'registration' && season.weeks.length > 0 && (
+                        <IconButton
+                          onClick={() => handleStartSeason(season._id)}
+                          size="small"
+                          color="success"
+                          title="Start Season"
+                        >
+                          <PlayArrow />
                         </IconButton>
                       )}
                       {season.status === 'draft' && season.weeks.length > 0 && (
