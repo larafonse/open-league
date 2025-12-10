@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -14,10 +14,12 @@ import {
   Typography,
   Avatar,
   Paper,
-  Grid,
-  Card,
-  CardContent,
-  CardActions,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
   Add,
@@ -30,6 +32,7 @@ import { teamsApi } from '../services/api';
 import type { Team } from '../types';
 
 const Teams: React.FC = () => {
+  const navigate = useNavigate();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -205,105 +208,103 @@ const Teams: React.FC = () => {
         </form>
       </Dialog>
 
-      {/* Teams Grid */}
+      {/* Teams Table */}
       {teams.length > 0 ? (
-        <Grid container spacing={3}>
-          {teams.map((team) => (
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={team._id}>
-              <Card
-                sx={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  borderLeft: `4px solid ${team.colors.primary}`,
-                }}
-              >
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Box display="flex" alignItems="center" mb={2}>
-                    <Avatar
-                      sx={{
-                        bgcolor: team.colors.primary,
-                        color: team.colors.secondary,
-                        width: 56,
-                        height: 56,
-                        mr: 2,
-                        fontSize: '1.5rem',
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      {team.name.charAt(0)}
-                    </Avatar>
-                    <Box flex={1}>
-                      <Typography variant="h6" component="h2" gutterBottom>
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Team</TableCell>
+                <TableCell>City</TableCell>
+                <TableCell>Coach</TableCell>
+                <TableCell>Founded</TableCell>
+                <TableCell>Record</TableCell>
+                <TableCell>Win %</TableCell>
+                <TableCell>Players</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {teams.map((team) => (
+                <TableRow 
+                  key={team._id} 
+                  hover
+                  sx={{ 
+                    cursor: 'pointer',
+                    '&:hover': {
+                      backgroundColor: 'action.hover'
+                    }
+                  }}
+                  onClick={() => navigate(`/teams/${team._id}`)}
+                >
+                  <TableCell>
+                    <Box display="flex" alignItems="center">
+                      <Avatar
+                        sx={{
+                          bgcolor: team.colors.primary,
+                          color: team.colors.secondary,
+                          mr: 2,
+                          width: 40,
+                          height: 40,
+                        }}
+                      >
+                        {team.name.charAt(0)}
+                      </Avatar>
+                      <Typography variant="subtitle1" fontWeight="medium">
                         {team.name}
                       </Typography>
-                      <Box display="flex" alignItems="center" color="text.secondary">
-                        <LocationOn fontSize="small" sx={{ mr: 0.5 }} />
-                        <Typography variant="body2">{team.city}</Typography>
-                      </Box>
                     </Box>
-                  </Box>
-
-                  <Box mb={2}>
-                    <Grid container spacing={1}>
-                      <Grid size={{ xs: 6 }}>
-                        <Typography variant="caption" color="textSecondary">
-                          Record
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium">
-                          {team.wins}-{team.losses}-{team.ties}
-                        </Typography>
-                      </Grid>
-                      <Grid size={{ xs: 6 }}>
-                        <Typography variant="caption" color="textSecondary">
-                          Win %
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium">
-                          {(team.winPercentage * 100).toFixed(1)}%
-                        </Typography>
-                      </Grid>
-                      <Grid size={{ xs: 6 }}>
-                        <Typography variant="caption" color="textSecondary">
-                          Players
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium">
-                          {Array.isArray(team.players) ? team.players.length : 0}
-                        </Typography>
-                      </Grid>
-                      {team.coach && (
-                        <Grid size={{ xs: 6 }}>
-                          <Typography variant="caption" color="textSecondary">
-                            Coach
-                          </Typography>
-                          <Typography variant="body2" fontWeight="medium">
-                            {team.coach}
-                          </Typography>
-                        </Grid>
-                      )}
-                    </Grid>
-                  </Box>
-                </CardContent>
-                <CardActions sx={{ justifyContent: 'flex-end', px: 2, pb: 2 }}>
-                  <IconButton
-                    component={Link}
-                    to={`/teams/${team._id}`}
-                    size="small"
-                    color="primary"
-                  >
-                    <Edit />
-                  </IconButton>
-                  <IconButton
-                    onClick={() => handleDelete(team._id)}
-                    size="small"
-                    color="error"
-                  >
-                    <Delete />
-                  </IconButton>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                  </TableCell>
+                  <TableCell>
+                    <Box display="flex" alignItems="center">
+                      <LocationOn fontSize="small" color="action" sx={{ mr: 0.5 }} />
+                      {team.city}
+                    </Box>
+                  </TableCell>
+                  <TableCell>{team.coach || '-'}</TableCell>
+                  <TableCell>{team.founded || '-'}</TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight="medium">
+                      {team.wins}-{team.losses}-{team.ties}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight="medium">
+                      {(team.winPercentage * 100).toFixed(1)}%
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {Array.isArray(team.players) ? team.players.length : 0}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                    <Box display="flex" gap={1} justifyContent="flex-end">
+                      <IconButton
+                        component={Link}
+                        to={`/teams/${team._id}`}
+                        size="small"
+                        color="primary"
+                      >
+                        <Edit />
+                      </IconButton>
+                      <IconButton
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(team._id);
+                        }}
+                        size="small"
+                        color="error"
+                      >
+                        <Delete />
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
       ) : (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <People sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />

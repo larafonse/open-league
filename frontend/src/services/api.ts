@@ -131,6 +131,8 @@ export const seasonsApi = {
     api.post(`/seasons/${id}/open-registration`).then(res => res.data),
   registerTeam: (id: string, teamId: string): Promise<Season> => 
     api.post(`/seasons/${id}/register-team`, { teamId }).then(res => res.data),
+  getAvailableTeams: (id: string): Promise<Team[]> => 
+    api.get(`/seasons/${id}/available-teams`).then(res => res.data),
   getStandings: (id: string): Promise<any[]> => 
     api.get(`/seasons/${id}/standings`).then(res => res.data),
 };

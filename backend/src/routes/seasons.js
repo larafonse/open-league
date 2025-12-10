@@ -7,6 +7,42 @@ const Game = require('../models/Game');
 const League = require('../models/League');
 const authenticate = require('../middleware/auth');
 
+// Helper function to safely serialize a season with virtuals
+function safeSerializeSeason(populatedSeason) {
+  // Convert to object without virtuals to avoid issues with undefined arrays
+  const seasonData = populatedSeason.toObject ? populatedSeason.toObject({ virtuals: false }) : populatedSeason;
+
+  // Ensure all arrays exist
+  const safeSeason = {
+    ...seasonData,
+    teams: Array.isArray(seasonData.teams) ? seasonData.teams : [],
+    standings: Array.isArray(seasonData.standings) ? seasonData.standings : [],
+    weeks: Array.isArray(seasonData.weeks) ? seasonData.weeks : [],
+  };
+
+  // Manually calculate virtuals with defensive checks
+  const weeksArray = safeSeason.weeks || [];
+  safeSeason.totalWeeks = Array.isArray(weeksArray) ? weeksArray.length : 0;
+  safeSeason.completedWeeks = Array.isArray(weeksArray)
+    ? weeksArray.filter(w => w && typeof w === 'object' && w.isCompleted === true).length
+    : 0;
+  safeSeason.progressPercentage = safeSeason.totalWeeks > 0
+    ? Math.round((safeSeason.completedWeeks / safeSeason.totalWeeks) * 100)
+    : 0;
+
+  // Calculate isActive
+  if (safeSeason.status === 'active' && safeSeason.startDate && safeSeason.endDate) {
+    const now = new Date();
+    const startDate = new Date(safeSeason.startDate);
+    const endDate = new Date(safeSeason.endDate);
+    safeSeason.isActive = now >= startDate && now <= endDate;
+  } else {
+    safeSeason.isActive = false;
+  }
+
+  return safeSeason;
+}
+
 // GET /api/seasons - Get all seasons (filtered by user's leagues and public leagues)
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -144,6 +180,149 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+// POST /api/seasons/:id/open-registration - Open season for team registration
+router.post('/:id/open-registration', authenticate, async (req, res) => {
+  console.log('POST /api/seasons/:id/open-registration hit with id:', req.params.id);
+  try {
+    const season = await Season.findById(req.params.id);
+
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user is a member of the league
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to open registration' });
+    }
+
+    if (season.status !== 'draft') {
+      return res.status(400).json({ message: 'Can only open registration for draft seasons' });
+    }
+
+    season.status = 'registration';
+    await season.save();
+
+    const populatedSeason = await Season.findById(season._id)
+      .populate('league', 'name')
+      .populate('teams', 'name city colors')
+      .populate('standings.team', 'name city colors');
+
+    res.json(safeSerializeSeason(populatedSeason));
+  } catch (error) {
+    res.status(500).json({ message: 'Error opening registration', error: error.message });
+  }
+});
+
+// POST /api/seasons/:id/register-team - Register a team for a season
+router.post('/:id/register-team', authenticate, [
+  body('teamId').isMongoId().withMessage('Valid team ID is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const season = await Season.findById(req.params.id);
+
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if season is open for registration
+    if (season.status !== 'registration') {
+      return res.status(400).json({ message: 'Season is not open for registration' });
+    }
+
+    // Check if user has access to the league (public or member)
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isPublic && !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to register teams' });
+    }
+
+    const { teamId } = req.body;
+
+    // Verify team exists
+    const team = await Team.findById(teamId);
+    if (!team) {
+      return res.status(404).json({ message: 'Team not found' });
+    }
+
+    // Check if team is already registered
+    const teamIds = (season.teams || []).map((t) => {
+      if (typeof t === 'string') return t;
+      if (t && t.toString) return t.toString();
+      if (t && t._id) return t._id.toString();
+      return t;
+    });
+    if (teamIds.includes(teamId)) {
+      return res.status(400).json({ message: 'Team is already registered for this season' });
+    }
+
+    // Add team to season
+    season.teams = season.teams || [];
+    season.teams.push(teamId);
+    await season.save();
+
+    const populatedSeason = await Season.findById(season._id)
+      .populate('league', 'name')
+      .populate('teams', 'name city colors')
+      .populate('standings.team', 'name city colors');
+
+    res.json(safeSerializeSeason(populatedSeason));
+  } catch (error) {
+    res.status(500).json({ message: 'Error registering team', error: error.message });
+  }
+});
+
+// GET /api/seasons/:id/available-teams - Get teams available for registration
+router.get('/:id/available-teams', authenticate, async (req, res) => {
+  try {
+    const season = await Season.findById(req.params.id);
+    
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user has access to the league (public or member)
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isPublic && !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to view available teams' });
+    }
+
+    // Get all teams
+    const allTeams = await Team.find().select('name city colors players captain');
+    
+    // Get teams already registered to this season
+    const registeredTeamIds = (season.teams || []).map((t) => {
+      if (typeof t === 'string') return t;
+      if (t && t.toString) return t.toString();
+      if (t && t._id) return t._id.toString();
+      return t;
+    });
+
+    // Filter out teams that are already registered
+    const availableTeams = allTeams.filter(team => {
+      const teamId = team._id.toString();
+      return !registeredTeamIds.includes(teamId);
+    });
+
+    res.json(availableTeams);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching available teams', error: error.message });
+  }
+});
+
 // GET /api/seasons/:id - Get season by ID
 router.get('/:id', authenticate, async (req, res) => {
   try {
@@ -172,7 +351,7 @@ router.get('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ message: 'You must be a member of this league to view seasons' });
     }
     
-    res.json(season);
+    res.json(safeSerializeSeason(season));
   } catch (error) {
     res.status(500).json({ message: 'Error fetching season', error: error.message });
   }
@@ -223,7 +402,7 @@ router.post('/', authenticate, [
       .populate('teams', 'name city colors')
       .populate('standings.team', 'name city colors');
     
-    res.status(201).json(populatedSeason);
+    res.status(201).json(safeSerializeSeason(populatedSeason));
   } catch (error) {
     res.status(500).json({ message: 'Error creating season', error: error.message });
   }
@@ -266,7 +445,7 @@ router.put('/:id', authenticate, [
       .populate('teams', 'name city colors')
       .populate('standings.team', 'name city colors');
     
-    res.json(populatedSeason);
+    res.json(safeSerializeSeason(populatedSeason));
   } catch (error) {
     res.status(500).json({ message: 'Error updating season', error: error.message });
   }
@@ -357,7 +536,7 @@ router.post('/:id/generate-schedule', authenticate, async (req, res) => {
         }
       });
     
-    res.json(populatedSeason);
+    res.json(safeSerializeSeason(populatedSeason));
   } catch (error) {
     res.status(500).json({ message: 'Error generating schedule', error: error.message });
   }
@@ -396,7 +575,7 @@ router.post('/:id/start', authenticate, async (req, res) => {
       .populate('teams', 'name city colors')
       .populate('standings.team', 'name city colors');
     
-    res.json(populatedSeason);
+    res.json(safeSerializeSeason(populatedSeason));
   } catch (error) {
     res.status(500).json({ message: 'Error starting season', error: error.message });
   }
@@ -431,7 +610,7 @@ router.post('/:id/complete', authenticate, async (req, res) => {
       .populate('teams', 'name city colors')
       .populate('standings.team', 'name city colors');
     
-    res.json(populatedSeason);
+    res.json(safeSerializeSeason(populatedSeason));
   } catch (error) {
     res.status(500).json({ message: 'Error completing season', error: error.message });
   }
@@ -507,107 +686,6 @@ router.delete('/:id', authenticate, async (req, res) => {
     res.json({ message: 'Season deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting season', error: error.message });
-  }
-});
-
-// POST /api/seasons/:id/open-registration - Open season for team registration
-router.post('/:id/open-registration', authenticate, async (req, res) => {
-  try {
-    const season = await Season.findById(req.params.id);
-
-    if (!season) {
-      return res.status(404).json({ message: 'Season not found' });
-    }
-
-    // Check if user is a member of the league
-    const league = await League.findById(season.league);
-    if (!league) {
-      return res.status(404).json({ message: 'League not found' });
-    }
-    if (!league.isMember(req.user._id)) {
-      return res.status(403).json({ message: 'You must be a member of this league to open registration' });
-    }
-
-    if (season.status !== 'draft') {
-      return res.status(400).json({ message: 'Can only open registration for draft seasons' });
-    }
-
-    season.status = 'registration';
-    await season.save();
-
-    const populatedSeason = await Season.findById(season._id)
-      .populate('league', 'name')
-      .populate('teams', 'name city colors')
-      .populate('standings.team', 'name city colors');
-
-    res.json(populatedSeason);
-  } catch (error) {
-    res.status(500).json({ message: 'Error opening registration', error: error.message });
-  }
-});
-
-// POST /api/seasons/:id/register-team - Register a team for a season
-router.post('/:id/register-team', authenticate, [
-  body('teamId').isMongoId().withMessage('Valid team ID is required')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const season = await Season.findById(req.params.id);
-
-    if (!season) {
-      return res.status(404).json({ message: 'Season not found' });
-    }
-
-    // Check if season is open for registration
-    if (season.status !== 'registration') {
-      return res.status(400).json({ message: 'Season is not open for registration' });
-    }
-
-    // Check if user has access to the league (public or member)
-    const league = await League.findById(season.league);
-    if (!league) {
-      return res.status(404).json({ message: 'League not found' });
-    }
-    if (!league.isPublic && !league.isMember(req.user._id)) {
-      return res.status(403).json({ message: 'You must be a member of this league to register teams' });
-    }
-
-    const { teamId } = req.body;
-
-    // Verify team exists
-    const team = await Team.findById(teamId);
-    if (!team) {
-      return res.status(404).json({ message: 'Team not found' });
-    }
-
-    // Check if team is already registered
-    const teamIds = (season.teams || []).map((t) => {
-      if (typeof t === 'string') return t;
-      if (t && t.toString) return t.toString();
-      if (t && t._id) return t._id.toString();
-      return t;
-    });
-    if (teamIds.includes(teamId)) {
-      return res.status(400).json({ message: 'Team is already registered for this season' });
-    }
-
-    // Add team to season
-    season.teams = season.teams || [];
-    season.teams.push(teamId);
-    await season.save();
-
-    const populatedSeason = await Season.findById(season._id)
-      .populate('league', 'name')
-      .populate('teams', 'name city colors')
-      .populate('standings.team', 'name city colors');
-
-    res.json(populatedSeason);
-  } catch (error) {
-    res.status(500).json({ message: 'Error registering team', error: error.message });
   }
 });
 
