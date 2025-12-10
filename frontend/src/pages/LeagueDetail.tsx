@@ -17,7 +17,6 @@ import {
   TextField,
   List,
   ListItem,
-  ListItemButton,
   ListItemText,
   ListItemAvatar,
   Avatar,
@@ -25,6 +24,14 @@ import {
   Divider,
   Tab,
   Tabs,
+  Autocomplete,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
 } from '@mui/material';
 import {
   Public,
@@ -36,9 +43,9 @@ import {
   PersonAdd,
   HowToReg,
 } from '@mui/icons-material';
-import { leaguesApi, seasonsApi, teamsApi, playersApi } from '../services/api';
+import { leaguesApi, seasonsApi, teamsApi, playersApi, gamesApi } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-import type { League, Season, Team, Player, CreateTeamData, CreatePlayerData } from '../types';
+import type { League, Season, Team, Player, CreateTeamData, CreatePlayerData, Game } from '../types';
 
 const LeagueDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -46,12 +53,15 @@ const LeagueDetail: React.FC = () => {
   const [league, setLeague] = useState<League | null>(null);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [games, setGames] = useState<Game[]>([]);
+  const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<number>(1);
+  const [seasonWithWeeks, setSeasonWithWeeks] = useState<Season | null>(null);
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showAddMemberDialog, setShowAddMemberDialog] = useState(false);
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
-  const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
   const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
   const [registeredTeams, setRegisteredTeams] = useState<Team[]>([]);
   const [registerMode, setRegisterMode] = useState<'team' | 'player'>('team');
@@ -85,9 +95,16 @@ const LeagueDetail: React.FC = () => {
     if (id) {
       fetchLeague();
       fetchSeasons();
-      fetchTeams();
     }
   }, [id]);
+
+  // Fetch teams and games when selected season changes
+  useEffect(() => {
+    if (selectedSeason && id) {
+      fetchTeams();
+      fetchGames();
+    }
+  }, [selectedSeason, id]);
 
   const fetchLeague = async () => {
     try {
@@ -109,7 +126,38 @@ const LeagueDetail: React.FC = () => {
     try {
       if (id) {
         const data = await leaguesApi.getSeasons(id);
-        setSeasons(data);
+      setSeasons(data);
+        // Set the most recent active season as default, or most recent completed season, or most recent season
+        if (data.length > 0) {
+          const activeSeason = data.find(s => s.status === 'active');
+          const completedSeasons = data.filter(s => s.status === 'completed');
+          const mostRecentCompleted = completedSeasons.length > 0
+            ? completedSeasons.sort((a, b) => 
+                new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
+              )[0]
+            : null;
+          const mostRecentSeason = data.sort((a, b) => 
+            new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+          )[0];
+          const seasonToSelect = activeSeason || mostRecentCompleted || mostRecentSeason;
+          setSelectedSeason(seasonToSelect);
+          // Fetch full season data with weeks
+          if (seasonToSelect) {
+            try {
+              const fullSeason = await seasonsApi.getById(seasonToSelect._id);
+              setSeasonWithWeeks(fullSeason);
+              // Set to first week if available
+              if (fullSeason.weeks && fullSeason.weeks.length > 0) {
+                setSelectedWeek(1);
+              }
+            } catch (error) {
+              console.error('Error fetching season with weeks:', error);
+            }
+          }
+        }
+        // Fetch games and teams after seasons are loaded
+        await fetchGames();
+        await fetchTeams();
       }
     } catch (error) {
       console.error('Error fetching seasons:', error);
@@ -119,11 +167,69 @@ const LeagueDetail: React.FC = () => {
   const fetchTeams = async () => {
     try {
       if (id) {
-        const data = await leaguesApi.getTeams(id);
-        setTeams(data);
+        // Get teams from the selected season
+        if (selectedSeason) {
+          // Fetch the season with populated teams
+          const seasonData = await seasonsApi.getById(selectedSeason._id);
+          if (seasonData && seasonData.teams) {
+            setTeams(seasonData.teams as Team[]);
+          } else {
+            // Fallback to all league teams
+            const data = await leaguesApi.getTeams(id);
+            setTeams(data);
+          }
+        } else {
+          // Fallback to all league teams
+          const data = await leaguesApi.getTeams(id);
+          setTeams(data);
+        }
       }
     } catch (error) {
       console.error('Error fetching teams:', error);
+    }
+  };
+
+  const fetchGames = async () => {
+    try {
+      if (id) {
+        // Get all games and filter by selected season
+        const allGames = await gamesApi.getAll();
+        if (selectedSeason) {
+          const seasonId = selectedSeason._id.toString();
+          const seasonGames = allGames.filter(game => {
+            // Handle both object and string season IDs
+            let gameSeasonId = null;
+            if (game.season) {
+              if (typeof game.season === 'object' && game.season._id) {
+                gameSeasonId = game.season._id.toString();
+              } else if (typeof game.season === 'string') {
+                gameSeasonId = game.season;
+              }
+            }
+            return gameSeasonId === seasonId;
+          });
+          setGames(seasonGames);
+        } else if (seasons.length > 0) {
+          // Fallback: show games from all seasons in the league
+          const seasonIds = seasons.map(s => s._id.toString());
+          const leagueGames = allGames.filter(game => {
+            let gameSeasonId = null;
+            if (game.season) {
+              if (typeof game.season === 'object' && game.season._id) {
+                gameSeasonId = game.season._id.toString();
+              } else if (typeof game.season === 'string') {
+                gameSeasonId = game.season;
+              }
+            }
+            return gameSeasonId && seasonIds.includes(gameSeasonId);
+          });
+          setGames(leagueGames);
+        } else {
+          setGames([]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching games:', error);
     }
   };
 
@@ -209,6 +315,7 @@ const LeagueDetail: React.FC = () => {
     try {
       await seasonsApi.registerTeam(selectedSeason._id, selectedTeam);
       await fetchSeasons();
+      await fetchTeams();
       setShowRegisterDialog(false);
       setSelectedTeam('');
     } catch (error) {
@@ -261,6 +368,7 @@ const LeagueDetail: React.FC = () => {
       // Add player to team
       await teamsApi.addPlayer(selectedTeam, newPlayer._id);
       
+      await fetchTeams();
       setShowRegisterDialog(false);
       setShowCreatePlayerForm(false);
       setSelectedTeam('');
@@ -271,7 +379,6 @@ const LeagueDetail: React.FC = () => {
         dateOfBirth: '',
         position: 'Midfielder',
       });
-      await fetchTeams();
     } catch (error: any) {
       console.error('Error creating player:', error);
       alert(error.response?.data?.message || 'Error creating player. Please try again.');
@@ -283,9 +390,9 @@ const LeagueDetail: React.FC = () => {
     
     try {
       await teamsApi.addPlayer(selectedTeam, userPlayer._id);
+      await fetchTeams();
       setShowRegisterDialog(false);
       setSelectedTeam('');
-      await fetchTeams();
     } catch (error: any) {
       console.error('Error joining team:', error);
       alert(error.response?.data?.message || 'Error joining team. Please try again.');
@@ -316,20 +423,20 @@ const LeagueDetail: React.FC = () => {
         <Box>
           <Box display="flex" alignItems="center" gap={1} mb={1}>
             <Typography variant="h3" component="h1">
-              {league.name}
-            </Typography>
-            {league.isPublic ? (
+          {league.name}
+        </Typography>
+          {league.isPublic ? (
               <Public fontSize="small" color="action" />
-            ) : (
+          ) : (
               <Lock fontSize="small" color="action" />
-            )}
-          </Box>
-          {league.description && (
-            <Typography variant="body1" color="textSecondary">
-              {league.description}
-            </Typography>
           )}
-          <Box display="flex" gap={1} mt={2} flexWrap="wrap">
+        </Box>
+        {league.description && (
+          <Typography variant="body1" color="textSecondary">
+            {league.description}
+          </Typography>
+          )}
+          <Box display="flex" gap={1} mt={2} flexWrap="wrap" alignItems="center">
             <Chip
               label={league.isMember ? 'Member' : 'Not a member'}
               color={league.isMember ? 'primary' : 'default'}
@@ -343,6 +450,55 @@ const LeagueDetail: React.FC = () => {
             <Chip
               label={`${seasons.length} season${seasons.length !== 1 ? 's' : ''}`}
             />
+            {seasons.length > 0 && (
+              <Autocomplete
+                options={seasons}
+                getOptionLabel={(option) => option.name}
+                value={selectedSeason}
+                onChange={async (_, newValue) => {
+                  setSelectedSeason(newValue);
+                  // Fetch full season data with weeks
+                  if (newValue) {
+                    try {
+                      const fullSeason = await seasonsApi.getById(newValue._id);
+                      setSeasonWithWeeks(fullSeason);
+                      // Set to first week if available
+                      if (fullSeason.weeks && fullSeason.weeks.length > 0) {
+                        setSelectedWeek(1);
+                      } else {
+                        setSelectedWeek(1);
+                      }
+                    } catch (error) {
+                      console.error('Error fetching season with weeks:', error);
+                    }
+                  } else {
+                    setSeasonWithWeeks(null);
+                    setSelectedWeek(1);
+                  }
+                  // Refresh teams and games when season changes
+                  await fetchTeams();
+                  await fetchGames();
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Season"
+                    size="small"
+                    sx={{ minWidth: 200 }}
+                  />
+                )}
+                renderOption={(props, option) => (
+                  <Box component="li" {...props} key={option._id}>
+                    <Box>
+                      <Typography variant="body1">{option.name}</Typography>
+                      <Typography variant="body2" color="textSecondary">
+                        {new Date(option.startDate).toLocaleDateString()} - {new Date(option.endDate).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+              />
+            )}
           </Box>
         </Box>
         {league.isOwner && (
@@ -366,20 +522,20 @@ const LeagueDetail: React.FC = () => {
         )}
       </Box>
 
-      <Card sx={{ mb: 3 }}>
+          <Card sx={{ mb: 3 }}>
         <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
           <Tab label="Overview" />
           <Tab label="Teams" />
-          <Tab label="Seasons" />
+          <Tab label="Games" />
           <Tab label="Members" />
         </Tabs>
       </Card>
 
       {tabValue === 0 && (
-        <Grid container spacing={3}>
+      <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 6 }}>
             <Card>
-              <CardContent>
+            <CardContent>
                 <Typography variant="h6" gutterBottom>
                   League Information
                 </Typography>
@@ -401,9 +557,9 @@ const LeagueDetail: React.FC = () => {
                   <Typography variant="body1">
                     {new Date(league.createdAt).toLocaleDateString()}
                   </Typography>
-                </Box>
+              </Box>
                 <Box mt={2}>
-                  <Typography variant="body2" color="textSecondary">
+                <Typography variant="body2" color="textSecondary">
                     Visibility
                   </Typography>
                   <Typography variant="body1">
@@ -415,30 +571,30 @@ const LeagueDetail: React.FC = () => {
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <Card>
-              <CardContent>
+            <CardContent>
                 <Typography variant="h6" gutterBottom>
                   Recent Seasons
                 </Typography>
                 {seasons.length === 0 ? (
                   <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
                     No seasons yet. Create a season to get started!
-                  </Typography>
-                ) : (
-                  <List>
+                </Typography>
+              ) : (
+                <List>
                     {seasons.slice(0, 5).map((season, index) => (
                       <React.Fragment key={season._id}>
-                        <ListItem
-                          sx={{ 
+                    <ListItem
+                      sx={{
                             cursor: 'pointer',
                             '&:hover': { backgroundColor: 'action.hover' }
-                          }}
-                        >
-                          <ListItemAvatar>
+                      }}
+                    >
+                      <ListItemAvatar>
                             <Avatar>
-                              <CalendarToday />
-                            </Avatar>
-                          </ListItemAvatar>
-                          <ListItemText
+                          <CalendarToday />
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
                             primary={
                               <Box display="flex" alignItems="center" gap={1}>
                                 <Typography 
@@ -453,10 +609,10 @@ const LeagueDetail: React.FC = () => {
                                 >
                                   {season.name}
                                 </Typography>
-                                <Chip 
-                                  label={season.status} 
-                                  size="small"
-                                  color={
+                            <Chip
+                              label={season.status}
+                              size="small"
+                              color={
                                     season.status === 'active' ? 'success' :
                                     season.status === 'registration' ? 'primary' :
                                     season.status === 'completed' ? 'default' :
@@ -469,11 +625,11 @@ const LeagueDetail: React.FC = () => {
                               <Box>
                                 <Typography variant="body2" color="textSecondary">
                                   {new Date(season.startDate).toLocaleDateString()} - {new Date(season.endDate).toLocaleDateString()}
-                                </Typography>
+                            </Typography>
                                 {season.status === 'draft' && league.isOwner && (
-                                  <Button
+                  <Button
                                     size="small"
-                                    variant="outlined"
+                    variant="outlined"
                                     startIcon={<PersonAdd />}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -486,7 +642,7 @@ const LeagueDetail: React.FC = () => {
                                 )}
                                 {season.status === 'registration' && (
                                   <Button
-                                    size="small"
+                    size="small"
                                     variant="contained"
                                     color="primary"
                                     startIcon={<HowToReg />}
@@ -499,15 +655,15 @@ const LeagueDetail: React.FC = () => {
                                     Register
                                   </Button>
                                 )}
-                              </Box>
-                            }
-                          />
-                        </ListItem>
+                          </Box>
+                        }
+                      />
+                    </ListItem>
                         {index < Math.min(seasons.length, 5) - 1 && <Divider />}
                       </React.Fragment>
-                    ))}
-                  </List>
-                )}
+                  ))}
+                </List>
+              )}
                 {seasons.length > 5 && (
                   <Box mt={2}>
                     <Button
@@ -519,8 +675,8 @@ const LeagueDetail: React.FC = () => {
                     </Button>
                   </Box>
                 )}
-              </CardContent>
-            </Card>
+            </CardContent>
+          </Card>
           </Grid>
         </Grid>
       )}
@@ -531,200 +687,323 @@ const LeagueDetail: React.FC = () => {
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="h6">Teams ({teams.length})</Typography>
               {league.isOwner && (
-                <Button
-                  variant="contained"
-                  startIcon={<Add />}
-                  component={Link}
-                  to="/teams"
-                >
-                  Add Team
-                </Button>
-              )}
+                  <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => {
+                      // Find a season in registration status, or use the selected season, or the first available season
+                      const registrationSeason = seasons.find(s => s.status === 'registration');
+                      const seasonToUse = registrationSeason || selectedSeason || seasons[0];
+                      if (seasonToUse) {
+                        handleOpenRegisterDialog(seasonToUse);
+                      } else {
+                        alert('No seasons available for registration. Please create a season first.');
+                      }
+                    }}
+                  >
+                    Register
+                  </Button>
+                )}
             </Box>
             {teams.length === 0 ? (
               <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
                 No teams in this league yet. Teams are added when you create seasons.
               </Typography>
             ) : (
-              <Grid container spacing={2}>
-                {teams.map((team) => (
-                  <Grid size={{ xs: 12, sm: 6, md: 4 }} key={team._id}>
-                    <Card
-                      component={Link}
-                      to={`/teams/${team._id}`}
-                      sx={{ 
-                        textDecoration: 'none', 
-                        height: '100%', 
-                        '&:hover': { boxShadow: 3 },
-                        borderLeft: `4px solid ${team.colors.primary}`
-                      }}
-                    >
-                      <CardContent>
-                        <Box display="flex" alignItems="center" gap={2} mb={1}>
-                          <Box
-                            sx={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: '50%',
-                              backgroundColor: team.colors.primary,
-                              border: `2px solid ${team.colors.secondary}`,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: team.colors.secondary,
-                              fontWeight: 'bold',
-                              fontSize: '1.2rem'
-                            }}
-                          >
-                            {team.name.charAt(0)}
-                          </Box>
-                          <Box flex={1}>
-                            <Typography variant="h6" gutterBottom>
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Team</TableCell>
+                      <TableCell>City</TableCell>
+                      <TableCell>Players</TableCell>
+                      <TableCell>Captain</TableCell>
+                      <TableCell>Record</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {teams.map((team) => (
+                      <TableRow
+                        key={team._id}
+                        component={Link}
+                        to={`/teams/${team._id}`}
+                        sx={{
+                          textDecoration: 'none',
+                          cursor: 'pointer',
+                          '&:hover': { backgroundColor: 'action.hover' },
+                          borderLeft: `4px solid ${team.colors.primary}`
+                        }}
+                      >
+                        <TableCell>
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <Box
+                              sx={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: '50%',
+                                backgroundColor: team.colors.primary,
+                                border: `2px solid ${team.colors.secondary}`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: team.colors.secondary,
+                                fontWeight: 'bold',
+                                fontSize: '0.9rem'
+                              }}
+                            >
+                              {team.name.charAt(0)}
+                            </Box>
+                            <Typography variant="body1" fontWeight="medium">
                               {team.name}
                             </Typography>
-                            <Typography variant="body2" color="textSecondary">
-                              {team.city}
-                            </Typography>
                           </Box>
-                        </Box>
-                        <Box mt={2}>
-                          <Typography variant="body2" color="textSecondary">
-                            Players: {Array.isArray(team.players) ? team.players.length : 0}
-                          </Typography>
-                          {team.captain && (
-                            <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
-                              Captain: {team.captain.firstName} {team.captain.lastName}
-                            </Typography>
-                          )}
-                          {(team.wins > 0 || team.losses > 0 || team.ties > 0) && (
-                            <Box mt={1}>
-                              <Typography variant="caption" color="textSecondary">
-                                Record: {team.wins}-{team.losses}-{team.ties}
-                              </Typography>
-                            </Box>
-                          )}
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
+                        </TableCell>
+                        <TableCell>{team.city}</TableCell>
+                        <TableCell>{Array.isArray(team.players) ? team.players.length : 0}</TableCell>
+                        <TableCell>
+                          {team.captain
+                            ? `${team.captain.firstName} ${team.captain.lastName}`
+                            : '—'}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            if (!selectedSeason || !selectedSeason.standings) {
+                              return '—';
+                            }
+                            const standing = selectedSeason.standings.find(
+                              (s: any) => {
+                                const teamId = typeof s.team === 'object' ? s.team._id : s.team;
+                                return teamId === team._id;
+                              }
+                            );
+                            if (standing && (standing.wins > 0 || standing.losses > 0 || standing.ties > 0)) {
+                              return `${standing.wins}-${standing.losses}-${standing.ties}`;
+                            }
+                            return '—';
+                          })()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             )}
           </CardContent>
         </Card>
       )}
 
       {tabValue === 2 && (
-        <Card>
-          <CardContent>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6">Seasons</Typography>
-              {league.isOwner && (
-                <Button
-                  variant="contained"
-                  startIcon={<Add />}
-                  component={Link}
-                  to={`/seasons?league=${league._id}`}
-                >
-                  Create Season
-                </Button>
+          <Card>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">
+                {seasonWithWeeks && seasonWithWeeks.weeks && seasonWithWeeks.weeks.length > 0
+                  ? `Week ${selectedWeek} of ${seasonWithWeeks.weeks.length}`
+                  : 'Games'}
+                </Typography>
+              {seasonWithWeeks && seasonWithWeeks.weeks && seasonWithWeeks.weeks.length > 0 && (
+                <Box display="flex" gap={1} alignItems="center">
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={selectedWeek <= 1}
+                    onClick={() => setSelectedWeek(prev => Math.max(1, prev - 1))}
+                  >
+                    Previous Week
+                  </Button>
+                  <Typography variant="body2" sx={{ minWidth: 100, textAlign: 'center' }}>
+                    Week {selectedWeek} / {seasonWithWeeks.weeks.length}
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={selectedWeek >= seasonWithWeeks.weeks.length}
+                    onClick={() => setSelectedWeek(prev => Math.min(seasonWithWeeks.weeks.length, prev + 1))}
+                  >
+                    Next Week
+                  </Button>
+                </Box>
               )}
             </Box>
-            {seasons.length === 0 ? (
+            {!selectedSeason ? (
               <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
-                No seasons in this league yet.
+                Please select a season to view games.
               </Typography>
-            ) : (
-              <Grid container spacing={2}>
-                {seasons.map((season) => (
-                  <Grid size={{ xs: 12, sm: 6, md: 4 }} key={season._id}>
-                    <Card
-                      component={Link}
-                      to={`/seasons/${season._id}`}
-                      sx={{ textDecoration: 'none', height: '100%', '&:hover': { boxShadow: 3 } }}
-                    >
-                      <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                          {season.name}
-                        </Typography>
-                        <Chip
-                          label={season.status}
-                          size="small"
-                          color={
-                            season.status === 'active'
-                              ? 'success'
-                              : season.status === 'completed'
-                              ? 'default'
-                              : 'primary'
-                          }
-                          sx={{ mb: 1 }}
-                        />
-                        <Typography variant="body2" color="textSecondary">
-                          {new Date(season.startDate).toLocaleDateString()} -{' '}
-                          {new Date(season.endDate).toLocaleDateString()}
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                          {Array.isArray(season.teams) ? season.teams.length : 0} teams
-                        </Typography>
-                        {season.status === 'completed' && season.standings && season.standings.length > 0 && (
-                          <Box sx={{ mt: 1 }}>
-                            <Typography variant="caption" color="textSecondary">
-                              Winner: {season.standings[0]?.team?.name || 'N/A'}
-                            </Typography>
-                          </Box>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            )}
+            ) : !seasonWithWeeks || !seasonWithWeeks.weeks || seasonWithWeeks.weeks.length === 0 ? (
+              <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
+                No games scheduled yet. Generate a schedule for this season to see games.
+              </Typography>
+            ) : (() => {
+              const currentWeek = seasonWithWeeks.weeks[selectedWeek - 1];
+              if (!currentWeek) {
+                return (
+                  <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
+                    Week {selectedWeek} not found.
+                  </Typography>
+                );
+              }
+              
+              const weekGames = currentWeek?.games || [];
+              
+              // Get full game details for the week
+              // weekGames can be either an array of game IDs (strings) or populated game objects
+              const weekGameDetails = games.filter((game: Game) => {
+                if (Array.isArray(weekGames)) {
+                  return weekGames.some((g: any) => {
+                    if (typeof g === 'object' && g._id) {
+                      // It's a populated game object
+                      return g._id === game._id;
+                    } else if (typeof g === 'string') {
+                      // It's a game ID
+                      return g === game._id;
+                    }
+                    return false;
+                  });
+                }
+                return false;
+              });
+              
+              // Also check if weekGames contains populated game objects directly
+              const populatedGames = weekGames.filter((g: any) => 
+                typeof g === 'object' && g._id && g.scheduledDate
+              ) as Game[];
+              
+              // Combine both sources, removing duplicates
+              const allWeekGames: Game[] = [
+                ...weekGameDetails,
+                ...populatedGames.filter((g: Game) => 
+                  !weekGameDetails.some((wg: Game) => wg._id === g._id)
+                )
+              ];
+              
+              return allWeekGames.length === 0 ? (
+                <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
+                  No games scheduled for Week {selectedWeek}.
+                </Typography>
+              ) : (
+                <>
+                  {currentWeek && (
+                    <Box mb={2}>
+                      <Typography variant="body2" color="textSecondary">
+                        {new Date(currentWeek.startDate).toLocaleDateString()} - {new Date(currentWeek.endDate).toLocaleDateString()}
+                      </Typography>
+                      {currentWeek.isCompleted && (
+                        <Chip label="Completed" size="small" color="success" sx={{ mt: 1 }} />
+                      )}
+                    </Box>
+                  )}
+                  <TableContainer component={Paper}>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Date</TableCell>
+                          <TableCell>Home Team</TableCell>
+                          <TableCell>Away Team</TableCell>
+                          <TableCell>Venue</TableCell>
+                          <TableCell>Status</TableCell>
+                          <TableCell>Score</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {allWeekGames
+                          .sort((a: Game, b: Game) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime())
+                          .map((game: Game) => (
+                            <TableRow
+                              key={game._id}
+                              component={Link}
+                              to={`/games/${game._id}`}
+                              sx={{
+                                textDecoration: 'none',
+                                cursor: 'pointer',
+                                '&:hover': { backgroundColor: 'action.hover' }
+                              }}
+                            >
+                              <TableCell>
+                                {new Date(game.scheduledDate).toLocaleDateString()} {new Date(game.scheduledDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </TableCell>
+                              <TableCell>
+                                {typeof game.homeTeam === 'object' ? game.homeTeam.name : '—'}
+                              </TableCell>
+                              <TableCell>
+                                {typeof game.awayTeam === 'object' ? game.awayTeam.name : '—'}
+                              </TableCell>
+                              <TableCell>
+                                {game.venue?.name || 'TBD'}
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  label={game.status}
+                                  size="small"
+                                  color={
+                                    game.status === 'completed'
+                                      ? 'success'
+                                      : game.status === 'in_progress'
+                                      ? 'warning'
+                                      : game.status === 'cancelled' || game.status === 'postponed'
+                                      ? 'error'
+                                      : 'default'
+                                  }
+                                />
+                              </TableCell>
+                              <TableCell>
+                                {game.status === 'completed' && game.score
+                                  ? `${game.score.homeTeam} - ${game.score.awayTeam}`
+                                  : '—'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
 
       {tabValue === 3 && (
-        <Card>
-          <CardContent>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Card>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="h6">Members ({league.memberCount})</Typography>
-              {league.isOwner && (
-                <Button
+                {league.isOwner && (
+                  <Button
                   variant="contained"
                   startIcon={<Add />}
-                  onClick={() => setShowAddMemberDialog(true)}
-                >
-                  Add Member
-                </Button>
-              )}
-            </Box>
-            <List>
-              <ListItem>
-                <ListItemAvatar>
+                    onClick={() => setShowAddMemberDialog(true)}
+                  >
+                    Add Member
+                  </Button>
+                )}
+              </Box>
+              <List>
+                <ListItem>
+                  <ListItemAvatar>
                   <Avatar sx={{ bgcolor: 'secondary.main' }}>
-                    {league.owner.firstName[0]}{league.owner.lastName[0]}
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={`${league.owner.firstName} ${league.owner.lastName}`}
+                      {league.owner.firstName[0]}{league.owner.lastName[0]}
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={`${league.owner.firstName} ${league.owner.lastName}`}
                   secondary={league.owner.email}
                 />
                 <Chip label="Owner" color="secondary" size="small" />
-              </ListItem>
+                </ListItem>
               {league.members && league.members.length > 0 && <Divider sx={{ my: 1 }} />}
               {league.members && league.members.length > 0 ? (
                 league.members.map((member, index) => (
                   <React.Fragment key={member._id}>
                     <ListItem>
-                      <ListItemAvatar>
-                        <Avatar>
+                    <ListItemAvatar>
+                      <Avatar>
                           {member.firstName?.[0]}{member.lastName?.[0]}
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={`${member.firstName} ${member.lastName}`}
-                        secondary={member.email}
-                      />
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={`${member.firstName} ${member.lastName}`}
+                      secondary={member.email}
+                    />
                       {league.isOwner && (
                         <IconButton
                           size="small"
@@ -734,7 +1013,7 @@ const LeagueDetail: React.FC = () => {
                           <Delete />
                         </IconButton>
                       )}
-                    </ListItem>
+                  </ListItem>
                     {index < league.members.length - 1 && <Divider />}
                   </React.Fragment>
                 ))
@@ -744,12 +1023,12 @@ const LeagueDetail: React.FC = () => {
                     primary="No additional members"
                     secondary="Only the owner is a member of this league"
                     sx={{ textAlign: 'center', py: 2 }}
-                  />
-                </ListItem>
+                    />
+                  </ListItem>
               )}
-            </List>
-          </CardContent>
-        </Card>
+              </List>
+            </CardContent>
+          </Card>
       )}
 
       {/* Edit Dialog */}
@@ -843,21 +1122,33 @@ const LeagueDetail: React.FC = () => {
                       No available teams. Create a new team to register.
                     </Typography>
                   ) : (
-                    <List>
-                      {availableTeams.map((team) => (
-                        <ListItem key={team._id} disablePadding>
-                          <ListItemButton
-                            selected={selectedTeam === team._id}
-                            onClick={() => setSelectedTeam(team._id)}
-                          >
-                            <ListItemText
-                              primary={team.name}
-                              secondary={team.city}
-                            />
-                          </ListItemButton>
-                        </ListItem>
-                      ))}
-                    </List>
+                    <Autocomplete
+                      options={availableTeams}
+                      getOptionLabel={(option) => `${option.name} - ${option.city}`}
+                      value={availableTeams.find(team => team._id === selectedTeam) || null}
+                      onChange={(_, newValue) => {
+                        setSelectedTeam(newValue?._id || '');
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Search and select a team"
+                          placeholder="Type to search teams..."
+                          margin="normal"
+                        />
+                      )}
+                      renderOption={(props, option) => (
+                        <Box component="li" {...props} key={option._id}>
+                          <Box>
+                            <Typography variant="body1">{option.name}</Typography>
+                            <Typography variant="body2" color="textSecondary">
+                              {option.city}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      )}
+                      sx={{ mt: 2, mb: 2 }}
+                    />
                   )}
                   <Button
                     variant="outlined"
@@ -873,12 +1164,12 @@ const LeagueDetail: React.FC = () => {
                   <Typography variant="h6" gutterBottom>
                     Create New Team
                   </Typography>
-                  <TextField
-                    fullWidth
+          <TextField
+            fullWidth
                     label="Team Name"
                     value={newTeamData.name}
                     onChange={(e) => setNewTeamData({ ...newTeamData, name: e.target.value })}
-                    margin="normal"
+            margin="normal"
                     required
                   />
                   <TextField
@@ -939,21 +1230,33 @@ const LeagueDetail: React.FC = () => {
                       <Typography variant="h6" gutterBottom>
                         Select a Team to Join
                       </Typography>
-                      <List>
-                        {registeredTeams.map((team) => (
-                          <ListItem key={team._id} disablePadding>
-                            <ListItemButton
-                              selected={selectedTeam === team._id}
-                              onClick={() => setSelectedTeam(team._id)}
-                            >
-                              <ListItemText
-                                primary={team.name}
-                                secondary={team.city}
-                              />
-                            </ListItemButton>
-                          </ListItem>
-                        ))}
-                      </List>
+                      <Autocomplete
+                        options={registeredTeams}
+                        getOptionLabel={(option) => `${option.name} - ${option.city}`}
+                        value={registeredTeams.find(team => team._id === selectedTeam) || null}
+                        onChange={(_, newValue) => {
+                          setSelectedTeam(newValue?._id || '');
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Search and select a team"
+                            placeholder="Type to search teams..."
+                            margin="normal"
+                          />
+                        )}
+                        renderOption={(props, option) => (
+                          <Box component="li" {...props} key={option._id}>
+                            <Box>
+                              <Typography variant="body1">{option.name}</Typography>
+                              <Typography variant="body2" color="textSecondary">
+                                {option.city}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        )}
+                        sx={{ mt: 2, mb: 2 }}
+                      />
                       {!userPlayer && selectedTeam && (
                         <Box sx={{ mt: 2 }}>
                           <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>

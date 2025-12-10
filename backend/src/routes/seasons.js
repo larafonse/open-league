@@ -469,8 +469,8 @@ router.post('/:id/generate-schedule', authenticate, async (req, res) => {
       return res.status(403).json({ message: 'You must be a member of this league to generate schedules' });
     }
 
-    if (season.status !== 'draft') {
-      return res.status(400).json({ message: 'Can only generate schedule for draft seasons' });
+    if (season.status !== 'draft' && season.status !== 'registration') {
+      return res.status(400).json({ message: 'Can only generate schedule for draft or registration seasons' });
     }
 
     if (!season.teams || season.teams.length < 2) {
@@ -508,7 +508,8 @@ router.post('/:id/generate-schedule', authenticate, async (req, res) => {
         });
         
         await game.save();
-        console.log(`Created game: ${matchup.home.name} vs ${matchup.away.name} on ${game.scheduledDate}`);
+        console.log(`Created game: ${game._id} for season ${season._id} (${season.name}) - ${matchup.home.name} vs ${matchup.away.name} on ${game.scheduledDate}`);
+        console.log(`Game season field: ${game.season}, type: ${typeof game.season}`);
         
         // Add the game ID to the week's games array
         week.games.push(game._id);
@@ -560,8 +561,8 @@ router.post('/:id/start', authenticate, async (req, res) => {
       return res.status(403).json({ message: 'You must be a member of this league to start seasons' });
     }
 
-    if (season.status !== 'draft') {
-      return res.status(400).json({ message: 'Can only start draft seasons' });
+    if (season.status !== 'draft' && season.status !== 'registration') {
+      return res.status(400).json({ message: 'Can only start draft or registration seasons' });
     }
 
     if (!season.weeks || season.weeks.length === 0) {

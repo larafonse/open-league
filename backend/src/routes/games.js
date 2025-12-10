@@ -77,13 +77,21 @@ router.get('/', async (req, res) => {
     const manuallyPopulatedGames = await Promise.all(rawGames.map(async (game) => {
       const homeTeam = await Team.findById(game.homeTeam);
       const awayTeam = await Team.findById(game.awayTeam);
-      const season = await require('../models/Season').findById(game.season);
+      let season = null;
+      if (game.season) {
+        season = await require('../models/Season').findById(game.season);
+        if (!season) {
+          console.log(`Warning: Game ${game._id} has season ID ${game.season} but season not found`);
+        }
+      } else {
+        console.log(`Warning: Game ${game._id} has no season field`);
+      }
       
       return {
         ...game.toObject(),
         homeTeam: homeTeam ? { _id: homeTeam._id, name: homeTeam.name, city: homeTeam.city, colors: homeTeam.colors } : null,
         awayTeam: awayTeam ? { _id: awayTeam._id, name: awayTeam.name, city: awayTeam.city, colors: awayTeam.colors } : null,
-        season: season ? { _id: season._id, name: season.name, status: season.status } : null
+        season: season ? { _id: season._id, name: season.name, status: season.status } : (game.season ? { _id: game.season } : null)
       };
     }));
     
