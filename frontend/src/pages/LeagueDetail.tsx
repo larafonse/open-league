@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import html2canvas from 'html2canvas';
 import {
   Box,
   Card,
@@ -41,6 +42,7 @@ import {
   Add,
   HowToReg,
   PlayArrow,
+  Share,
 } from '@mui/icons-material';
 import { leaguesApi, seasonsApi, teamsApi, playersApi, gamesApi, venuesApi } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
@@ -141,6 +143,9 @@ const LeagueDetail: React.FC = () => {
   });
   const [statistics, setStatistics] = useState<{ topScorers: any[]; standings: any[] } | null>(null);
   const [loadingStatistics, setLoadingStatistics] = useState(false);
+  const shareableContentRef = useRef<HTMLDivElement>(null);
+  const hatTrickContentRef = useRef<HTMLDivElement>(null);
+  const [hatTrickPlayer, setHatTrickPlayer] = useState<any | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -206,6 +211,90 @@ const LeagueDetail: React.FC = () => {
       setStatistics(null);
     } finally {
       setLoadingStatistics(false);
+    }
+  };
+
+  // Check for hat-trick when game is selected
+  useEffect(() => {
+    if (selectedGame && selectedGame.status === 'completed' && selectedGame.events) {
+      const goalEvents = selectedGame.events.filter((e: any) => e.type === 'goal' && e.player);
+      const playerGoals = new Map<string, { player: any; team: any; count: number }>();
+
+      goalEvents.forEach((event: any) => {
+        const playerId = typeof event.player === 'object' && event.player._id 
+          ? event.player._id.toString() 
+          : String(event.player);
+        
+        if (!playerGoals.has(playerId)) {
+          playerGoals.set(playerId, {
+            player: typeof event.player === 'object' ? event.player : null,
+            team: typeof event.team === 'object' ? event.team : null,
+            count: 0,
+          });
+        }
+        
+        const playerData = playerGoals.get(playerId);
+        if (playerData) {
+          playerData.count++;
+        }
+      });
+
+      // Find players with hat-trick (3+ goals)
+      const hatTrickPlayers = Array.from(playerGoals.values()).filter(p => p.count >= 3);
+      setHatTrickPlayer(hatTrickPlayers.length > 0 ? hatTrickPlayers[0] : null);
+    } else {
+      setHatTrickPlayer(null);
+    }
+  }, [selectedGame]);
+
+  // Generate and download shareable image for completed game
+  const handleShareGame = async () => {
+    if (!selectedGame || !shareableContentRef.current) return;
+
+    try {
+      const canvas = await html2canvas(shareableContentRef.current, {
+        backgroundColor: '#000000',
+        scale: 2,
+        logging: false,
+      });
+
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `game-${selectedGame._id}-${new Date().getTime()}.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error generating shareable image:', error);
+      alert('Error generating image. Please try again.');
+    }
+  };
+
+  // Generate and download hat-trick image
+  const handleShareHatTrick = async () => {
+    if (!selectedGame || !hatTrickContentRef.current || !hatTrickPlayer) return;
+
+    try {
+      const canvas = await html2canvas(hatTrickContentRef.current, {
+        backgroundColor: '#000000',
+        scale: 2,
+        logging: false,
+      });
+
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      const playerName = hatTrickPlayer.player 
+        ? `${hatTrickPlayer.player.firstName}-${hatTrickPlayer.player.lastName}`.toLowerCase()
+        : 'player';
+      link.download = `hattrick-${playerName}-${selectedGame._id}-${new Date().getTime()}.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error generating hat-trick image:', error);
+      alert('Error generating hat-trick image. Please try again.');
     }
   };
 
@@ -1626,20 +1715,20 @@ const LeagueDetail: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {venue.fullAddress || (
-                              <Box>
-                                {venue.address?.street && (
-                                  <Typography variant="body2">{venue.address.street}</Typography>
-                                )}
-                                <Typography variant="body2" color="textSecondary">
-                                  {[
-                                    venue.address?.city,
-                                    venue.address?.state,
-                                    venue.address?.zipCode
-                                  ].filter(Boolean).join(', ')}
-                                </Typography>
-                              </Box>
-                            )}
+                          {venue.fullAddress || (
+                            <Box>
+                              {venue.address?.street && (
+                                <Typography variant="body2">{venue.address.street}</Typography>
+                              )}
+                              <Typography variant="body2" color="textSecondary">
+                                {[
+                                  venue.address?.city,
+                                  venue.address?.state,
+                                  venue.address?.zipCode
+                                ].filter(Boolean).join(', ')}
+                              </Typography>
+                            </Box>
+                          )}
                           </Typography>
                         </TableCell>
                         <TableCell>
@@ -1692,8 +1781,8 @@ const LeagueDetail: React.FC = () => {
                         <TableCell>
                           <Box display="flex" alignItems="center" gap={1}>
                             <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
-                              {league.owner.firstName[0]}{league.owner.lastName[0]}
-                            </Avatar>
+                      {league.owner.firstName[0]}{league.owner.lastName[0]}
+                    </Avatar>
                             <Typography variant="body2" fontWeight="medium">
                               {league.owner.firstName} {league.owner.lastName}
                             </Typography>
@@ -1703,7 +1792,7 @@ const LeagueDetail: React.FC = () => {
                           <Typography variant="body2">{league.owner.email}</Typography>
                         </TableCell>
                         <TableCell>
-                          <Chip label="Owner" color="secondary" size="small" />
+                  <Chip label="Owner" color="secondary" size="small" />
                         </TableCell>
                         {league.isOwner && <TableCell></TableCell>}
                       </TableRow>
@@ -1712,8 +1801,8 @@ const LeagueDetail: React.FC = () => {
                           <TableCell>
                             <Box display="flex" alignItems="center" gap={1}>
                               <Avatar sx={{ width: 32, height: 32 }}>
-                                {member.firstName?.[0]}{member.lastName?.[0]}
-                              </Avatar>
+                            {member.firstName?.[0]}{member.lastName?.[0]}
+                      </Avatar>
                               <Typography variant="body2" fontWeight="medium">
                                 {member.firstName} {member.lastName}
                               </Typography>
@@ -1725,15 +1814,15 @@ const LeagueDetail: React.FC = () => {
                           <TableCell>
                             <Chip label="Member" size="small" />
                           </TableCell>
-                          {league.isOwner && (
+                        {league.isOwner && (
                             <TableCell>
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => handleRemoveMember(member._id)}
-                              >
-                                <Delete />
-                              </IconButton>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleRemoveMember(member._id)}
+                          >
+                            <Delete />
+                          </IconButton>
                             </TableCell>
                           )}
                         </TableRow>
@@ -1789,9 +1878,9 @@ const LeagueDetail: React.FC = () => {
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2">
-                                {typeof player.team === 'object' && player.team
-                                  ? `${player.team.name} (${player.team.city})`
-                                  : '—'}
+                              {typeof player.team === 'object' && player.team
+                                ? `${player.team.name} (${player.team.city})`
+                                : '—'}
                               </Typography>
                             </TableCell>
                             <TableCell>
@@ -2940,6 +3029,239 @@ const LeagueDetail: React.FC = () => {
         </DialogTitle>
         <DialogContent>
           {selectedGame && (
+            <>
+              {/* Hidden shareable content for image generation */}
+              {selectedGame.status === 'completed' && (
+                <>
+                <Box
+                  ref={shareableContentRef}
+                  sx={{
+                    position: 'absolute',
+                    left: '-9999px',
+                    width: '800px',
+                    backgroundColor: '#000000',
+                    p: 4,
+                    color: '#ffffff',
+                  }}
+                >
+                  <Box sx={{ textAlign: 'center', mb: 3 }}>
+                    <Typography variant="h4" fontWeight="bold" sx={{ mb: 1, color: '#ffffff' }}>
+                      {league?.name || 'League'}
+                    </Typography>
+                    <Typography variant="body1" sx={{ color: '#cccccc' }}>
+                      {selectedGame.season && typeof selectedGame.season === 'object' 
+                        ? selectedGame.season.name 
+                        : 'Season'}
+                    </Typography>
+                  </Box>
+                  
+                  <Box display="flex" alignItems="center" justifyContent="center" gap={4} mb={3} p={3}>
+                    <Box 
+                      textAlign="center"
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        bgcolor: typeof selectedGame.homeTeam === 'object' && selectedGame.homeTeam.colors
+                          ? `${selectedGame.homeTeam.colors.primary}20`
+                          : 'rgba(255, 255, 255, 0.1)',
+                        border: `2px solid ${typeof selectedGame.homeTeam === 'object' && selectedGame.homeTeam.colors
+                          ? `${selectedGame.homeTeam.colors.primary}40`
+                          : 'rgba(255, 255, 255, 0.2)'}`,
+                      }}
+                    >
+                      <Typography 
+                        variant="h2" 
+                        fontWeight="bold" 
+                        sx={{ 
+                          fontSize: '3rem',
+                          color: '#ffffff'
+                        }}
+                      >
+                        {selectedGame.score?.homeTeam || 0}
+                      </Typography>
+                      <Typography 
+                        variant="h6" 
+                        fontWeight="medium" 
+                        sx={{ 
+                          mt: 1,
+                          color: '#ffffff'
+                        }}
+                      >
+                        {typeof selectedGame.homeTeam === 'object' ? selectedGame.homeTeam.name : 'Home'}
+                      </Typography>
+                    </Box>
+                    <Typography variant="h3" sx={{ fontSize: '2rem', color: '#ffffff' }}>VS</Typography>
+                    <Box 
+                      textAlign="center"
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        bgcolor: typeof selectedGame.awayTeam === 'object' && selectedGame.awayTeam.colors
+                          ? `${selectedGame.awayTeam.colors.primary}20`
+                          : 'rgba(255, 255, 255, 0.1)',
+                        border: `2px solid ${typeof selectedGame.awayTeam === 'object' && selectedGame.awayTeam.colors
+                          ? `${selectedGame.awayTeam.colors.primary}40`
+                          : 'rgba(255, 255, 255, 0.2)'}`,
+                      }}
+                    >
+                      <Typography 
+                        variant="h2" 
+                        fontWeight="bold" 
+                        sx={{ 
+                          fontSize: '3rem',
+                          color: '#ffffff'
+                        }}
+                      >
+                        {selectedGame.score?.awayTeam || 0}
+                      </Typography>
+                      <Typography 
+                        variant="h6" 
+                        fontWeight="medium" 
+                        sx={{ 
+                          mt: 1,
+                          color: '#ffffff'
+                        }}
+                      >
+                        {typeof selectedGame.awayTeam === 'object' ? selectedGame.awayTeam.name : 'Away'}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body1" sx={{ color: '#cccccc' }} align="center">
+                      {new Date(selectedGame.actualDate || selectedGame.scheduledDate).toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </Typography>
+                    {selectedGame.venue?.name && (
+                      <Typography variant="body2" sx={{ color: '#cccccc' }} align="center">
+                        {selectedGame.venue.name}
+                      </Typography>
+                    )}
+                  </Box>
+
+                  {selectedGame.events && selectedGame.events.length > 0 && (
+                    <Box sx={{ mt: 3 }}>
+                      <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, textAlign: 'center', color: '#ffffff' }}>
+                        Match Events
+                      </Typography>
+                      {selectedGame.events
+                        .filter((e: any) => e.type === 'goal')
+                        .sort((a: any, b: any) => (a.minute || 0) - (b.minute || 0))
+                        .slice(0, 5)
+                        .map((event: any, idx: number) => {
+                          const eventTeam = typeof event.team === 'object' ? event.team : null;
+                          const teamColor = eventTeam && eventTeam.colors ? eventTeam.colors.primary : null;
+                          return (
+                            <Box 
+                              key={idx} 
+                              sx={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                mb: 1, 
+                                p: 1, 
+                                bgcolor: teamColor ? `${teamColor}15` : '#1a1a1a',
+                                borderRadius: 1,
+                                border: teamColor ? `1px solid ${teamColor}30` : 'none',
+                              }}
+                            >
+                              <Typography variant="body1" fontWeight="medium" sx={{ color: '#ffffff' }}>
+                                {event.minute}'
+                              </Typography>
+                              <Typography variant="body1" sx={{ color: '#ffffff' }}>
+                                {typeof event.player === 'object' && event.player
+                                  ? `${event.player.firstName} ${event.player.lastName}`
+                                  : '—'}
+                              </Typography>
+                              <Typography variant="body1" fontWeight="medium" sx={{ color: '#ffffff' }}>
+                                {eventTeam ? eventTeam.name : '—'}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Hidden hat-trick shareable content */}
+                {hatTrickPlayer && hatTrickPlayer.player && (
+                  <Box
+                    ref={hatTrickContentRef}
+                    sx={{
+                      position: 'absolute',
+                      left: '-9999px',
+                      width: '800px',
+                      backgroundColor: '#000000',
+                      p: 4,
+                      color: '#ffffff',
+                    }}
+                  >
+                    <Box sx={{ textAlign: 'center', mb: 3 }}>
+                      <Typography variant="h3" fontWeight="bold" sx={{ mb: 1, color: '#FFD700', fontSize: '2.5rem' }}>
+                        HAT-TRICK
+                      </Typography>
+                      <Typography variant="h5" fontWeight="bold" sx={{ mb: 1, color: '#ffffff' }}>
+                        {league?.name || 'League'}
+                      </Typography>
+                      <Typography variant="body1" sx={{ color: '#cccccc' }}>
+                        {selectedGame.season && typeof selectedGame.season === 'object' 
+                          ? selectedGame.season.name 
+                          : 'Season'}
+                      </Typography>
+                    </Box>
+                    
+                    <Box 
+                      sx={{
+                        textAlign: 'center',
+                        p: 4,
+                        borderRadius: 3,
+                        bgcolor: hatTrickPlayer.team && hatTrickPlayer.team.colors
+                          ? `${hatTrickPlayer.team.colors.primary}25`
+                          : 'rgba(255, 215, 0, 0.1)',
+                        border: `3px solid ${hatTrickPlayer.team && hatTrickPlayer.team.colors
+                          ? `${hatTrickPlayer.team.colors.primary}60`
+                          : 'rgba(255, 215, 0, 0.3)'}`,
+                        mb: 3,
+                      }}
+                    >
+                      <Typography variant="h1" fontWeight="bold" sx={{ fontSize: '5rem', color: '#FFD700', mb: 2 }}>
+                        3
+                      </Typography>
+                      <Typography variant="h3" fontWeight="bold" sx={{ color: '#ffffff', mb: 1 }}>
+                        GOALS
+                      </Typography>
+                      <Typography variant="h4" fontWeight="medium" sx={{ color: '#ffffff', mb: 2 }}>
+                        {hatTrickPlayer.player.firstName} {hatTrickPlayer.player.lastName}
+                        {hatTrickPlayer.player.jerseyNumber && ` #${hatTrickPlayer.player.jerseyNumber}`}
+                      </Typography>
+                      {hatTrickPlayer.team && (
+                        <Typography variant="h5" sx={{ color: '#cccccc' }}>
+                          {hatTrickPlayer.team.name}
+                        </Typography>
+                      )}
+                    </Box>
+
+                    <Box sx={{ mb: 2, textAlign: 'center' }}>
+                      <Typography variant="h5" fontWeight="bold" sx={{ color: '#ffffff', mb: 2 }}>
+                        {typeof selectedGame.homeTeam === 'object' ? selectedGame.homeTeam.name : 'Home'} {selectedGame.score?.homeTeam || 0} - {selectedGame.score?.awayTeam || 0} {typeof selectedGame.awayTeam === 'object' ? selectedGame.awayTeam.name : 'Away'}
+                      </Typography>
+                      <Typography variant="body1" sx={{ color: '#cccccc' }}>
+                        {new Date(selectedGame.actualDate || selectedGame.scheduledDate).toLocaleDateString('en-US', { 
+                          weekday: 'long', 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+                </>
+              )}
+
             <Box sx={{ mt: 2 }}>
               {/* Current Score Display */}
               <Box display="flex" alignItems="center" justifyContent="center" gap={3} mb={3} p={2} sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
@@ -3113,9 +3435,38 @@ const LeagueDetail: React.FC = () => {
                 </>
               )}
             </Box>
+            </>
           )}
         </DialogContent>
         <DialogActions>
+          {selectedGame?.status === 'completed' && (
+            <>
+              <Button
+                startIcon={<Share />}
+                onClick={handleShareGame}
+                variant="outlined"
+                color="primary"
+              >
+                Share Game
+              </Button>
+              {hatTrickPlayer && (
+                <Button
+                  startIcon={<Share />}
+                  onClick={handleShareHatTrick}
+                  variant="contained"
+                  sx={{
+                    bgcolor: '#FFD700',
+                    color: '#000000',
+                    '&:hover': {
+                      bgcolor: '#FFC700',
+                    },
+                  }}
+                >
+                  Share Hat-Trick
+                </Button>
+              )}
+            </>
+          )}
           <Button 
             onClick={() => {
               setShowScoreDialog(false);

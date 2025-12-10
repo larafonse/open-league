@@ -17,6 +17,7 @@
     "@mui/material": "^7.3.4",
     "@types/react-router-dom": "^5.3.3",
     "axios": "^1.13.1",
+    "html2canvas": "^1.4.1",
     "lucide-react": "^0.548.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
