@@ -15,10 +15,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
   Avatar,
   IconButton,
   Divider,
@@ -43,11 +39,8 @@ import {
   Edit,
   Delete,
   Add,
-  CalendarToday,
-  PersonAdd,
   HowToReg,
   PlayArrow,
-  SportsSoccer,
 } from '@mui/icons-material';
 import { leaguesApi, seasonsApi, teamsApi, playersApi, gamesApi, venuesApi } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
@@ -177,6 +170,28 @@ const LeagueDetail: React.FC = () => {
       setStatistics(null);
     }
   }, [selectedSeason, id]);
+
+  // Fetch statistics for active season when on overview tab
+  useEffect(() => {
+    if (tabValue === 0 && seasons.length > 0) {
+      const activeSeason = seasons.find(s => s.status === 'active') || seasons.find(s => s.status === 'completed') || seasons[0];
+      if (activeSeason && (!selectedSeason || selectedSeason._id !== activeSeason._id)) {
+        const fetchActiveSeasonStats = async () => {
+          setLoadingStatistics(true);
+          try {
+            const data = await seasonsApi.getStatistics(activeSeason._id);
+            setStatistics(data);
+          } catch (error) {
+            console.error('Error fetching statistics:', error);
+            setStatistics(null);
+          } finally {
+            setLoadingStatistics(false);
+          }
+        };
+        fetchActiveSeasonStats();
+      }
+    }
+  }, [tabValue, seasons]);
 
   // Fetch statistics for the selected season
   const fetchStatistics = async () => {
@@ -469,15 +484,6 @@ const LeagueDetail: React.FC = () => {
     }
   };
 
-  const handleOpenRegistration = async (seasonId: string) => {
-    try {
-      await seasonsApi.openRegistration(seasonId);
-      await fetchSeasons();
-    } catch (error) {
-      console.error('Error opening registration:', error);
-    }
-  };
-
   const handleStartSeason = async () => {
     if (!selectedSeason) return;
     try {
@@ -666,16 +672,9 @@ const LeagueDetail: React.FC = () => {
           </Typography>
         )}
           <Box display="flex" gap={1} mt={2} flexWrap="wrap" alignItems="center">
-            <Chip
-              label={league.isMember ? 'Member' : 'Not a member'}
-              color={league.isMember ? 'primary' : 'default'}
-            />
                 {league.isOwner && (
               <Chip label="Owner" color="secondary" />
             )}
-            <Chip
-              label={`${league.memberCount} member${league.memberCount !== 1 ? 's' : ''}`}
-            />
             <Chip
               label={`${seasons.length} season${seasons.length !== 1 ? 's' : ''}`}
             />
@@ -781,40 +780,82 @@ const LeagueDetail: React.FC = () => {
       </Card>
 
       {tabValue === 0 && (
-      <Grid container spacing={3}>
+        <>
+          {/* Standings and Top Scorers for Overview */}
+        {(() => {
+          // Get the active season or most recent season for overview stats
+          const activeSeason = seasons.find(s => s.status === 'active') || seasons.find(s => s.status === 'completed') || seasons[0];
+          
+          if (!activeSeason || !statistics) {
+            return null;
+          }
+
+          const topFourStandings = statistics.standings.slice(0, 4);
+          const topThreeScorers = statistics.topScorers.slice(0, 3);
+
+          return (
+            <Grid container spacing={3} sx={{ mt: 0 }}>
           <Grid size={{ xs: 12, md: 6 }}>
             <Card>
             <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  League Information
+                      League Standings
                 </Typography>
-                <Box mt={2}>
-                <Typography variant="body2" color="textSecondary">
-                    Owner
+                    {topFourStandings.length > 0 ? (
+                      <TableContainer component={Paper} variant="outlined">
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Rank</TableCell>
+                              <TableCell>Club</TableCell>
+                              <TableCell align="center">Pts</TableCell>
+                              <TableCell align="center">GD</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {topFourStandings.map((standing, index) => {
+                              if (!standing.team) return null;
+                              return (
+                                <TableRow 
+                                  key={standing.team._id || index} 
+                                  hover
+                                  sx={{
+                                    bgcolor: 'rgba(25, 118, 210, 0.08)',
+                                    borderLeft: '3px solid',
+                                    borderLeftColor: 'primary.main',
+                                  }}
+                                >
+                                  <TableCell>
+                                    <Typography variant="body2" fontWeight="bold">
+                                      {index + 1}
                   </Typography>
-                  <Typography variant="body1">
-                    {league.owner.firstName} {league.owner.lastName}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="body2" fontWeight="medium">
+                                      {standing.team.name}
                   </Typography>
-                  <Typography variant="caption" color="textSecondary">
-                    {league.owner.email}
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Typography variant="body2" fontWeight="bold">
+                                      {standing.Pts}
                   </Typography>
-                </Box>
-                <Box mt={2}>
-                  <Typography variant="body2" color="textSecondary">
-                    Created
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Typography variant="body2" color={standing.GD > 0 ? 'success.main' : standing.GD < 0 ? 'error.main' : 'text.secondary'}>
+                                      {standing.GD > 0 ? '+' : ''}{standing.GD}
                   </Typography>
-                  <Typography variant="body1">
-                    {new Date(league.createdAt).toLocaleDateString()}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    ) : (
+                      <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
+                        No standings available yet.
                   </Typography>
-              </Box>
-                <Box mt={2}>
-                <Typography variant="body2" color="textSecondary">
-                    Visibility
-                  </Typography>
-                  <Typography variant="body1">
-                    {league.isPublic ? 'Public' : 'Private'}
-                  </Typography>
-                </Box>
+                    )}
               </CardContent>
             </Card>
           </Grid>
@@ -822,112 +863,73 @@ const LeagueDetail: React.FC = () => {
             <Card>
             <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  Recent Seasons
+                      Top Scorers
                 </Typography>
-                {seasons.length === 0 ? (
-                  <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
-                    No seasons yet. Create a season to get started!
-                </Typography>
-              ) : (
-                <List>
-                    {seasons.slice(0, 5).map((season, index) => (
-                      <React.Fragment key={season._id}>
-                    <ListItem
+                    {topThreeScorers.length > 0 ? (
+                      <TableContainer component={Paper} variant="outlined">
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Rank</TableCell>
+                              <TableCell>Player</TableCell>
+                              <TableCell align="center">Goals</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {topThreeScorers.map((scorer, index) => {
+                              if (!scorer.player) return null;
+                              return (
+                                <TableRow 
+                                  key={scorer.player._id || index} 
+                                  hover
                       sx={{
-                            cursor: 'pointer',
-                            '&:hover': { backgroundColor: 'action.hover' }
-                      }}
-                    >
-                      <ListItemAvatar>
-                            <Avatar>
-                          <CalendarToday />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                            primary={
-                              <Box display="flex" alignItems="center" gap={1}>
-                                <Typography 
-                                  component={Link}
-                                  to={`/seasons/${season._id}`}
-                                  variant="body1"
-                                  sx={{ 
-                                    textDecoration: 'none',
-                                    color: 'inherit',
-                                    '&:hover': { textDecoration: 'underline' }
+                                    bgcolor: 'rgba(25, 118, 210, 0.08)',
+                                    borderLeft: '3px solid',
+                                    borderLeftColor: 'primary.main',
                                   }}
                                 >
-                                  {season.name}
+                                  <TableCell>
+                                    <Typography variant="body2" fontWeight="bold">
+                                      {index + 1}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                              <Box display="flex" alignItems="center" gap={1}>
+                                      <Typography variant="body2" fontWeight="medium">
+                                        {scorer.player.firstName} {scorer.player.lastName}
                                 </Typography>
+                                      {scorer.player.jerseyNumber && (
                             <Chip
-                              label={season.status}
-                              size="small"
-                              color={
-                                    season.status === 'active' ? 'success' :
-                                    season.status === 'registration' ? 'primary' :
-                                    season.status === 'completed' ? 'default' :
-                                    'warning'
-                              }
-                            />
-                              </Box>
-                            }
-                            secondary={
-                              <Box>
-                                <Typography variant="body2" color="textSecondary">
-                                  {new Date(season.startDate).toLocaleDateString()} - {new Date(season.endDate).toLocaleDateString()}
-                            </Typography>
-                                {season.status === 'draft' && league.isOwner && (
-                  <Button
+                                          label={`#${scorer.player.jerseyNumber}`} 
                                     size="small"
                     variant="outlined"
-                                    startIcon={<PersonAdd />}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenRegistration(season._id);
-                                    }}
-                                    sx={{ mt: 1 }}
-                                  >
-                                    Open Registration
-                                  </Button>
-                                )}
-                                {season.status === 'registration' && (
-                                  <Button
-                    size="small"
-                                    variant="contained"
-                                    color="primary"
-                                    startIcon={<HowToReg />}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenRegisterDialog(season);
-                                    }}
-                                    sx={{ mt: 1 }}
-                                  >
-                                    Register
-                                  </Button>
-                                )}
-                          </Box>
-                        }
-                      />
-                    </ListItem>
-                        {index < Math.min(seasons.length, 5) - 1 && <Divider />}
-                      </React.Fragment>
-                  ))}
-                </List>
-              )}
-                {seasons.length > 5 && (
-                  <Box mt={2}>
-                    <Button
-                      component={Link}
-                      to={`/seasons?league=${league._id}`}
-                      fullWidth
-                    >
-                      View All Seasons
-                    </Button>
+                                        />
+                                      )}
                   </Box>
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Typography variant="body2" fontWeight="bold" color="primary">
+                                      {scorer.goals}
+                                    </Typography>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    ) : (
+                      <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
+                        No goal data available yet.
+                      </Typography>
               )}
             </CardContent>
           </Card>
         </Grid>
         </Grid>
+          );
+        })()}
+      </>
       )}
 
       {tabValue === 1 && seasons.length > 0 && (
@@ -941,8 +943,8 @@ const LeagueDetail: React.FC = () => {
                 No teams in this league yet. Teams are added when you create seasons.
                 </Typography>
             ) : (
-              <TableContainer component={Paper}>
-                <Table>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
                   <TableHead>
                     <TableRow>
                       <TableCell>Team</TableCell>
@@ -958,10 +960,10 @@ const LeagueDetail: React.FC = () => {
                         key={team._id}
                         component={Link}
                         to={`/teams/${team._id}`}
+                        hover
                         sx={{
                           textDecoration: 'none',
                           cursor: 'pointer',
-                          '&:hover': { backgroundColor: 'action.hover' },
                           borderLeft: `4px solid ${team.colors.primary}`
                         }}
                       >
@@ -984,19 +986,26 @@ const LeagueDetail: React.FC = () => {
                             >
                               {team.name.charAt(0)}
                             </Box>
-                            <Typography variant="body1" fontWeight="medium">
+                            <Typography variant="body2" fontWeight="medium">
                               {team.name}
                             </Typography>
                           </Box>
                         </TableCell>
-                        <TableCell>{team.city}</TableCell>
-                        <TableCell>{Array.isArray(team.players) ? team.players.length : 0}</TableCell>
                         <TableCell>
+                          <Typography variant="body2">{team.city}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{Array.isArray(team.players) ? team.players.length : 0}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
                           {team.captain
                             ? `${team.captain.firstName} ${team.captain.lastName}`
                             : '—'}
+                          </Typography>
                         </TableCell>
                         <TableCell>
+                          <Typography variant="body2">
                           {(() => {
                             if (!selectedSeason || !selectedSeason.standings) {
                               return '—';
@@ -1012,6 +1021,7 @@ const LeagueDetail: React.FC = () => {
                             }
                             return '—';
                           })()}
+                          </Typography>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1123,8 +1133,8 @@ const LeagueDetail: React.FC = () => {
                       )}
                     </Box>
                   )}
-                  <TableContainer component={Paper}>
-                    <Table>
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
                       <TableHead>
                         <TableRow>
                           <TableCell>Date</TableCell>
@@ -1144,23 +1154,31 @@ const LeagueDetail: React.FC = () => {
                               key={game._id}
                               component={Link}
                               to={`/games/${game._id}`}
+                              hover
                               sx={{
                                 textDecoration: 'none',
-                                cursor: 'pointer',
-                                '&:hover': { backgroundColor: 'action.hover' }
+                                cursor: 'pointer'
                               }}
                             >
                               <TableCell>
+                                <Typography variant="body2">
                                 {new Date(game.scheduledDate).toLocaleDateString()} {new Date(game.scheduledDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </Typography>
                               </TableCell>
                               <TableCell>
+                                <Typography variant="body2" fontWeight="medium">
                                 {typeof game.homeTeam === 'object' ? game.homeTeam.name : '—'}
+                                </Typography>
                               </TableCell>
                               <TableCell>
+                                <Typography variant="body2" fontWeight="medium">
                                 {typeof game.awayTeam === 'object' ? game.awayTeam.name : '—'}
+                                </Typography>
                               </TableCell>
                               <TableCell>
+                                <Typography variant="body2">
                                 {game.venue?.name || 'TBD'}
+                                </Typography>
                               </TableCell>
                               <TableCell>
                                 <Chip
@@ -1180,9 +1198,11 @@ const LeagueDetail: React.FC = () => {
                                 />
                               </TableCell>
                               <TableCell>
+                                <Typography variant="body2" fontWeight={game.score ? 'bold' : 'normal'}>
                                 {game.score && (game.status === 'completed' || game.status === 'in_progress')
                                   ? `${game.score.homeTeam} - ${game.score.awayTeam}`
                                   : '—'}
+                                </Typography>
                               </TableCell>
                               {(league.isMember || league.isOwner) && (
                                 <TableCell onClick={(e) => e.stopPropagation()}>
@@ -1273,6 +1293,28 @@ const LeagueDetail: React.FC = () => {
                                         Manage Game
                                       </Button>
                                     )}
+                                    {game.status === 'completed' && (
+                                      <Button
+                                        size="small"
+                                        variant="outlined"
+                                        color="primary"
+                                        onClick={async (e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          // Fetch full game details with populated events
+                                          try {
+                                            const gameDetails = await gamesApi.getById(game._id);
+                                            setSelectedGame(gameDetails);
+                                            setShowScoreDialog(true);
+                                          } catch (error) {
+                                            console.error('Error fetching game details:', error);
+                                            alert('Error loading game details. Please try again.');
+                                          }
+                                        }}
+                                      >
+                                        Details
+                                      </Button>
+                                    )}
                                   </Box>
                                 </TableCell>
                               )}
@@ -1295,51 +1337,133 @@ const LeagueDetail: React.FC = () => {
               loadingStatistics ? (
                 <Box display="flex" justifyContent="center" py={4}>
                   <CircularProgress />
-                </Box>
+            </Box>
               ) : statistics ? (
                 <>
-                  {/* Top Scorer Card */}
-                  {statistics.topScorers.length > 0 && statistics.topScorers[0] && (
-                    <Box mb={4}>
-                      <Card sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                        <CardContent>
-                          <Box display="flex" alignItems="center" justifyContent="space-between">
-                            <Box display="flex" alignItems="center" gap={2}>
-                              <Avatar sx={{ bgcolor: 'rgba(255, 255, 255, 0.2)', width: 64, height: 64 }}>
-                                <SportsSoccer sx={{ fontSize: 32, color: 'white' }} />
-                              </Avatar>
-                              <Box>
-                                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                  Top Scorer
-                                </Typography>
-                                <Typography variant="h5" sx={{ color: 'white', fontWeight: 'bold' }}>
-                                  {statistics.topScorers[0].player
-                                    ? `${statistics.topScorers[0].player.firstName} ${statistics.topScorers[0].player.lastName}`
-                                    : '—'}
-                                </Typography>
-                                {statistics.topScorers[0].team && (
-                                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                    {statistics.topScorers[0].team.name}
-                                  </Typography>
-                                )}
-                              </Box>
-                            </Box>
-                            <Box textAlign="right">
-                              <Typography variant="h2" sx={{ color: 'white', fontWeight: 'bold' }}>
-                                {statistics.topScorers[0].goals}
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                {statistics.topScorers[0].goals === 1 ? 'Goal' : 'Goals'}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    </Box>
-                  )}
-
-                  {/* Top Scorers and Standings Side by Side */}
+                  {/* Standings and Top Scorers Side by Side */}
                   <Box display="flex" flexDirection={{ xs: 'column', md: 'row' }} gap={3}>
+                  {/* Standings Section */}
+                    <Box flex={1}>
+                  <Typography variant="h6" gutterBottom>
+                    Standings
+                  </Typography>
+                      {statistics.standings.length > 0 ? (
+                        <TableContainer component={Paper} variant="outlined">
+                          <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Rank</TableCell>
+                        <TableCell>Club</TableCell>
+                        <TableCell align="center">MP</TableCell>
+                        <TableCell align="center">W</TableCell>
+                        <TableCell align="center">D</TableCell>
+                        <TableCell align="center">L</TableCell>
+                        <TableCell align="center">GF</TableCell>
+                        <TableCell align="center">GA</TableCell>
+                        <TableCell align="center">GD</TableCell>
+                        <TableCell align="center">Pts</TableCell>
+                        <TableCell align="center">Last 5</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                              {statistics.standings.map((standing, index) => {
+                                if (!standing.team) return null;
+                                const isTopFour = index < 4;
+                        return (
+                                  <TableRow 
+                                    key={standing.team._id || index} 
+                                    hover
+                                    sx={{
+                                      bgcolor: isTopFour ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
+                                      borderLeft: isTopFour ? '3px solid' : 'none',
+                                      borderLeftColor: isTopFour ? 'primary.main' : 'transparent',
+                                      '&:hover': {
+                                        bgcolor: isTopFour ? 'rgba(25, 118, 210, 0.12)' : undefined,
+                                      },
+                                    }}
+                                  >
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="bold">
+                              {index + 1}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="medium">
+                                        {standing.team.name}
+                            </Typography>
+                                      {standing.team.city && (
+                              <Typography variant="caption" color="textSecondary">
+                                          {standing.team.city}
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">{standing.MP}</Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">{standing.W}</Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">{standing.D}</Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">{standing.L}</Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">{standing.GF}</Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">{standing.GA}</Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2" color={standing.GD > 0 ? 'success.main' : standing.GD < 0 ? 'error.main' : 'text.secondary'}>
+                              {standing.GD > 0 ? '+' : ''}{standing.GD}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2" fontWeight="bold">
+                              {standing.Pts}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Box display="flex" gap={0.5} justifyContent="center">
+                                        {standing.last5 && standing.last5.length > 0 ? (
+                                          standing.last5.map((result: 'W' | 'D' | 'L', idx: number) => (
+                                  <Chip
+                                    key={idx}
+                                    label={result}
+                                    size="small"
+                                    sx={{
+                                      minWidth: 32,
+                                      height: 24,
+                                      fontSize: '0.7rem',
+                                      bgcolor: result === 'W' ? 'success.main' : result === 'D' ? 'warning.main' : 'error.main',
+                                      color: 'white',
+                                    }}
+                                  />
+                                ))
+                              ) : (
+                                <Typography variant="caption" color="textSecondary">
+                                  —
+                                </Typography>
+                              )}
+                            </Box>
+                          </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Box textAlign="center" py={4}>
+                  <Typography variant="body2" color="textSecondary">
+                    No teams registered for this season.
+                  </Typography>
+                </Box>
+              )}
+                    </Box>
+
                     {/* Top Scorers Section */}
                     <Box flex={1}>
                       <Typography variant="h6" gutterBottom>
@@ -1359,8 +1483,20 @@ const LeagueDetail: React.FC = () => {
                             <TableBody>
                               {statistics.topScorers.map((scorer, index) => {
                                 if (!scorer.player) return null;
+                                const isTopThree = index < 3;
                                 return (
-                                  <TableRow key={scorer.player._id || index} hover>
+                                  <TableRow 
+                                    key={scorer.player._id || index} 
+                                    hover
+                                    sx={{
+                                      bgcolor: isTopThree ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
+                                      borderLeft: isTopThree ? '3px solid' : 'none',
+                                      borderLeftColor: isTopThree ? 'primary.main' : 'transparent',
+                                      '&:hover': {
+                                        bgcolor: isTopThree ? 'rgba(25, 118, 210, 0.12)' : undefined,
+                                      },
+                                    }}
+                                  >
                                     <TableCell>
                                       <Typography variant="body2" fontWeight="bold">
                                         {index + 1}
@@ -1410,121 +1546,11 @@ const LeagueDetail: React.FC = () => {
                         </Box>
                       )}
                     </Box>
-
-                    {/* Standings Section */}
-                    <Box flex={1}>
-                      <Typography variant="h6" gutterBottom>
-                        Standings
-                      </Typography>
-                      {statistics.standings.length > 0 ? (
-                        <TableContainer component={Paper} variant="outlined">
-                          <Table size="small">
-                            <TableHead>
-                              <TableRow>
-                                <TableCell>Rank</TableCell>
-                                <TableCell>Club</TableCell>
-                                <TableCell align="center">MP</TableCell>
-                                <TableCell align="center">W</TableCell>
-                                <TableCell align="center">D</TableCell>
-                                <TableCell align="center">L</TableCell>
-                                <TableCell align="center">GF</TableCell>
-                                <TableCell align="center">GA</TableCell>
-                                <TableCell align="center">GD</TableCell>
-                                <TableCell align="center">Pts</TableCell>
-                                <TableCell align="center">Last 5</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {statistics.standings.map((standing, index) => {
-                                if (!standing.team) return null;
-                                return (
-                                  <TableRow key={standing.team._id || index} hover>
-                                    <TableCell>
-                                      <Typography variant="body2" fontWeight="bold">
-                                        {index + 1}
-                                      </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Typography variant="body2" fontWeight="medium">
-                                        {standing.team.name}
-                                      </Typography>
-                                      {standing.team.city && (
-                                        <Typography variant="caption" color="textSecondary">
-                                          {standing.team.city}
-                                        </Typography>
-                                      )}
-                                    </TableCell>
-                                    <TableCell align="center">
-                                      <Typography variant="body2">{standing.MP}</Typography>
-                                    </TableCell>
-                                    <TableCell align="center">
-                                      <Typography variant="body2">{standing.W}</Typography>
-                                    </TableCell>
-                                    <TableCell align="center">
-                                      <Typography variant="body2">{standing.D}</Typography>
-                                    </TableCell>
-                                    <TableCell align="center">
-                                      <Typography variant="body2">{standing.L}</Typography>
-                                    </TableCell>
-                                    <TableCell align="center">
-                                      <Typography variant="body2">{standing.GF}</Typography>
-                                    </TableCell>
-                                    <TableCell align="center">
-                                      <Typography variant="body2">{standing.GA}</Typography>
-                                    </TableCell>
-                                    <TableCell align="center">
-                                      <Typography variant="body2" color={standing.GD > 0 ? 'success.main' : standing.GD < 0 ? 'error.main' : 'text.secondary'}>
-                                        {standing.GD > 0 ? '+' : ''}{standing.GD}
-                                      </Typography>
-                                    </TableCell>
-                                    <TableCell align="center">
-                                      <Typography variant="body2" fontWeight="bold">
-                                        {standing.Pts}
-                                      </Typography>
-                                    </TableCell>
-                                    <TableCell align="center">
-                                      <Box display="flex" gap={0.5} justifyContent="center">
-                                        {standing.last5 && standing.last5.length > 0 ? (
-                                          standing.last5.map((result: 'W' | 'D' | 'L', idx: number) => (
-                                            <Chip
-                                              key={idx}
-                                              label={result}
-                                              size="small"
-                                              sx={{
-                                                minWidth: 32,
-                                                height: 24,
-                                                fontSize: '0.7rem',
-                                                bgcolor: result === 'W' ? 'success.main' : result === 'D' ? 'warning.main' : 'error.main',
-                                                color: 'white',
-                                              }}
-                                            />
-                                          ))
-                                        ) : (
-                                          <Typography variant="caption" color="textSecondary">
-                                            —
-                                          </Typography>
-                                        )}
-                                      </Box>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      ) : (
-                        <Box textAlign="center" py={4}>
-                          <Typography variant="body2" color="textSecondary">
-                            No teams registered for this season.
-                          </Typography>
-                        </Box>
-                      )}
-                    </Box>
                   </Box>
                 </>
               ) : (
-                <Box textAlign="center" py={4}>
-                  <Typography variant="body2" color="textSecondary">
+              <Box textAlign="center" py={4}>
+                <Typography variant="body2" color="textSecondary">
                     No statistics available for this season.
                   </Typography>
                 </Box>
@@ -1579,8 +1605,8 @@ const LeagueDetail: React.FC = () => {
                 No venues associated with this season.
               </Typography>
             ) : (
-              <TableContainer component={Paper}>
-                <Table>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
                   <TableHead>
                     <TableRow>
                       <TableCell>Name</TableCell>
@@ -1592,29 +1618,33 @@ const LeagueDetail: React.FC = () => {
                   </TableHead>
                   <TableBody>
                     {venues.map((venue) => (
-                      <TableRow key={venue._id}>
+                      <TableRow key={venue._id} hover>
                         <TableCell>
-                          <Typography variant="body1" fontWeight="medium">
+                          <Typography variant="body2" fontWeight="medium">
                             {venue.name}
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          {venue.fullAddress || (
-                            <Box>
-                              {venue.address?.street && (
-                                <Typography variant="body2">{venue.address.street}</Typography>
-                              )}
-                              <Typography variant="body2" color="textSecondary">
-                                {[
-                                  venue.address?.city,
-                                  venue.address?.state,
-                                  venue.address?.zipCode
-                                ].filter(Boolean).join(', ')}
-                              </Typography>
-                            </Box>
-                          )}
+                          <Typography variant="body2">
+                            {venue.fullAddress || (
+                              <Box>
+                                {venue.address?.street && (
+                                  <Typography variant="body2">{venue.address.street}</Typography>
+                                )}
+                                <Typography variant="body2" color="textSecondary">
+                                  {[
+                                    venue.address?.city,
+                                    venue.address?.state,
+                                    venue.address?.zipCode
+                                  ].filter(Boolean).join(', ')}
+                                </Typography>
+                              </Box>
+                            )}
+                          </Typography>
                         </TableCell>
-                        <TableCell>{venue.capacity || '—'}</TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{venue.capacity || '—'}</Typography>
+                        </TableCell>
                         <TableCell>
                           {venue.surface && (
                             <Chip label={venue.surface} size="small" />
@@ -1647,48 +1677,70 @@ const LeagueDetail: React.FC = () => {
               {/* League Members Section */}
               <Box mb={4}>
                 <Typography variant="h6" gutterBottom>League Members</Typography>
-              <List>
-                <ListItem>
-                  <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: 'secondary.main' }}>
-                      {league.owner.firstName[0]}{league.owner.lastName[0]}
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={`${league.owner.firstName} ${league.owner.lastName}`}
-                    secondary={league.owner.email}
-                  />
-                  <Chip label="Owner" color="secondary" size="small" />
-                </ListItem>
-                {league.members && league.members.length > 0 && <Divider sx={{ my: 1 }} />}
-                {league.members && league.members.length > 0 && (
-                  league.members.map((member, index) => (
-                    <React.Fragment key={member._id}>
-                      <ListItem>
-                    <ListItemAvatar>
-                      <Avatar>
-                            {member.firstName?.[0]}{member.lastName?.[0]}
-                      </Avatar>
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={`${member.firstName} ${member.lastName}`}
-                      secondary={member.email}
-                    />
-                        {league.isOwner && (
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleRemoveMember(member._id)}
-                          >
-                            <Delete />
-                          </IconButton>
-                        )}
-                  </ListItem>
-                      {index < league.members.length - 1 && <Divider />}
-                    </React.Fragment>
-                  ))
-                )}
-              </List>
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Name</TableCell>
+                        <TableCell>Email</TableCell>
+                        <TableCell>Role</TableCell>
+                        {league.isOwner && <TableCell>Actions</TableCell>}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      <TableRow hover>
+                        <TableCell>
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
+                              {league.owner.firstName[0]}{league.owner.lastName[0]}
+                            </Avatar>
+                            <Typography variant="body2" fontWeight="medium">
+                              {league.owner.firstName} {league.owner.lastName}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{league.owner.email}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip label="Owner" color="secondary" size="small" />
+                        </TableCell>
+                        {league.isOwner && <TableCell></TableCell>}
+                      </TableRow>
+                      {league.members && league.members.length > 0 && league.members.map((member) => (
+                        <TableRow key={member._id} hover>
+                          <TableCell>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Avatar sx={{ width: 32, height: 32 }}>
+                                {member.firstName?.[0]}{member.lastName?.[0]}
+                              </Avatar>
+                              <Typography variant="body2" fontWeight="medium">
+                                {member.firstName} {member.lastName}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">{member.email}</Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip label="Member" size="small" />
+                          </TableCell>
+                          {league.isOwner && (
+                            <TableCell>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleRemoveMember(member._id)}
+                              >
+                                <Delete />
+                              </IconButton>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               </Box>
 
               {/* Players from Teams Section */}
@@ -1699,8 +1751,8 @@ const LeagueDetail: React.FC = () => {
                     No players found in teams for this league.
                   </Typography>
                 ) : (
-                  <TableContainer component={Paper}>
-                    <Table>
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
                       <TableHead>
                         <TableRow>
                           <TableCell>Name</TableCell>
@@ -1716,10 +1768,10 @@ const LeagueDetail: React.FC = () => {
                             key={player._id}
                             component={Link}
                             to={`/players/${player._id}`}
+                            hover
                             sx={{
                               textDecoration: 'none',
-                              cursor: 'pointer',
-                              '&:hover': { backgroundColor: 'action.hover' }
+                              cursor: 'pointer'
                             }}
                           >
                             <TableCell>
@@ -1727,7 +1779,7 @@ const LeagueDetail: React.FC = () => {
                                 <Avatar sx={{ width: 32, height: 32 }}>
                                   {player.firstName[0]}{player.lastName[0]}
                                 </Avatar>
-                                <Typography variant="body2">
+                                <Typography variant="body2" fontWeight="medium">
                                   {player.firstName} {player.lastName}
                                 </Typography>
                                 {player.isCaptain && (
@@ -1736,13 +1788,21 @@ const LeagueDetail: React.FC = () => {
                               </Box>
                             </TableCell>
                             <TableCell>
-                              {typeof player.team === 'object' && player.team
-                                ? `${player.team.name} (${player.team.city})`
-                                : '—'}
+                              <Typography variant="body2">
+                                {typeof player.team === 'object' && player.team
+                                  ? `${player.team.name} (${player.team.city})`
+                                  : '—'}
+                              </Typography>
                             </TableCell>
-                            <TableCell>{player.position}</TableCell>
-                            <TableCell>{player.jerseyNumber || '—'}</TableCell>
-                            <TableCell>{player.email}</TableCell>
+                            <TableCell>
+                              <Typography variant="body2">{player.position}</Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">{player.jerseyNumber || '—'}</Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">{player.email}</Typography>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -2876,7 +2936,7 @@ const LeagueDetail: React.FC = () => {
         fullWidth
       >
         <DialogTitle>
-          Manage Game {selectedGame && `- ${typeof selectedGame.homeTeam === 'object' ? selectedGame.homeTeam.name : 'Home'} vs ${typeof selectedGame.awayTeam === 'object' ? selectedGame.awayTeam.name : 'Away'}`}
+          {selectedGame?.status === 'completed' ? 'Game Details' : 'Manage Game'} {selectedGame && `- ${typeof selectedGame.homeTeam === 'object' ? selectedGame.homeTeam.name : 'Home'} vs ${typeof selectedGame.awayTeam === 'object' ? selectedGame.awayTeam.name : 'Away'}`}
         </DialogTitle>
         <DialogContent>
           {selectedGame && (
@@ -2959,6 +3019,8 @@ const LeagueDetail: React.FC = () => {
                 </Box>
               )}
 
+              {selectedGame.status !== 'completed' && (
+                <>
               <Divider sx={{ my: 3 }} />
 
               {/* Add New Event */}
@@ -3048,6 +3110,8 @@ const LeagueDetail: React.FC = () => {
                   />
                 </Box>
               </Box>
+                </>
+              )}
             </Box>
           )}
         </DialogContent>
@@ -3067,8 +3131,9 @@ const LeagueDetail: React.FC = () => {
               });
             }}
           >
-            Cancel
+            {selectedGame?.status === 'completed' ? 'Close' : 'Cancel'}
           </Button>
+          {selectedGame?.status !== 'completed' && (
           <Button
             onClick={async () => {
               if (!selectedGame || !newEventData.player || !newEventData.team) {
@@ -3110,6 +3175,8 @@ const LeagueDetail: React.FC = () => {
           >
             Add Event
           </Button>
+          )}
+          {selectedGame?.status === 'in_progress' && (
           <Button
             onClick={async () => {
               if (!selectedGame) return;
@@ -3141,6 +3208,7 @@ const LeagueDetail: React.FC = () => {
           >
             Complete Game
           </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Container>
