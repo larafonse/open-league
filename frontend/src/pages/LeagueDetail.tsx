@@ -43,7 +43,7 @@ import {
   PersonAdd,
   HowToReg,
 } from '@mui/icons-material';
-import { leaguesApi, seasonsApi, teamsApi, playersApi, gamesApi } from '../services/api';
+import { leaguesApi, seasonsApi, teamsApi, playersApi, gamesApi, venuesApi } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import type { League, Season, Team, Player, CreateTeamData, CreatePlayerData, Game } from '../types';
 
@@ -57,6 +57,38 @@ const LeagueDetail: React.FC = () => {
   const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [seasonWithWeeks, setSeasonWithWeeks] = useState<Season | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [venues, setVenues] = useState<any[]>([]);
+  const [allVenues, setAllVenues] = useState<any[]>([]);
+  const [showAddVenueDialog, setShowAddVenueDialog] = useState(false);
+  const [showCreateVenueDialog, setShowCreateVenueDialog] = useState(false);
+  const [showCreateSeasonDialog, setShowCreateSeasonDialog] = useState(false);
+  const [selectedVenueForAdd, setSelectedVenueForAdd] = useState<any | null>(null);
+  const [newSeasonData, setNewSeasonData] = useState({
+    name: '',
+    description: '',
+    startDate: '',
+    endDate: '',
+  });
+  const [newVenueData, setNewVenueData] = useState({
+    name: '',
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      country: 'USA'
+    },
+    capacity: '',
+    surface: 'Grass',
+    amenities: [] as string[],
+    contact: {
+      name: '',
+      phone: '',
+      email: ''
+    },
+    notes: ''
+  });
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -98,13 +130,27 @@ const LeagueDetail: React.FC = () => {
     }
   }, [id]);
 
-  // Fetch teams and games when selected season changes
+  // Fetch teams, games, and venues when selected season changes
   useEffect(() => {
     if (selectedSeason && id) {
       fetchTeams();
       fetchGames();
+      fetchVenues();
     }
   }, [selectedSeason, id]);
+
+  // Fetch all venues on mount
+  useEffect(() => {
+    const loadVenues = async () => {
+      try {
+        const data = await venuesApi.getAll();
+        setAllVenues(data);
+      } catch (error) {
+        console.error('Error fetching all venues:', error);
+      }
+    };
+    loadVenues();
+  }, []);
 
   const fetchLeague = async () => {
     try {
@@ -155,9 +201,10 @@ const LeagueDetail: React.FC = () => {
             }
           }
         }
-        // Fetch games and teams after seasons are loaded
+        // Fetch games, teams, and players after seasons are loaded
         await fetchGames();
         await fetchTeams();
+        await fetchPlayers();
       }
     } catch (error) {
       console.error('Error fetching seasons:', error);
@@ -186,6 +233,98 @@ const LeagueDetail: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching teams:', error);
+    }
+  };
+
+  const fetchPlayers = async () => {
+    try {
+      if (id) {
+        const data = await leaguesApi.getPlayers(id);
+        setPlayers(data);
+      }
+    } catch (error) {
+      console.error('Error fetching players:', error);
+    }
+  };
+
+  const fetchVenues = async () => {
+    try {
+      if (selectedSeason && id) {
+        const data = await seasonsApi.getVenues(selectedSeason._id);
+        setVenues(data);
+      }
+    } catch (error) {
+      console.error('Error fetching venues:', error);
+    }
+  };
+
+  const handleAddVenue = async () => {
+    if (!selectedSeason || !selectedVenueForAdd) return;
+    try {
+      await seasonsApi.addVenue(selectedSeason._id, selectedVenueForAdd._id);
+      await fetchVenues();
+      setShowAddVenueDialog(false);
+      setSelectedVenueForAdd(null);
+    } catch (error) {
+      console.error('Error adding venue:', error);
+      alert('Error adding venue. Please try again.');
+    }
+  };
+
+  const handleRemoveVenue = async (venueId: string) => {
+    if (!selectedSeason) return;
+    if (!window.confirm('Remove this venue from the season?')) return;
+    try {
+      await seasonsApi.removeVenue(selectedSeason._id, venueId);
+      await fetchVenues();
+    } catch (error) {
+      console.error('Error removing venue:', error);
+      alert('Error removing venue. Please try again.');
+    }
+  };
+
+  const handleCreateVenue = async () => {
+    if (!selectedSeason) return;
+    try {
+      // Create the venue
+      const venueData = {
+        ...newVenueData,
+        capacity: newVenueData.capacity ? parseInt(newVenueData.capacity.toString()) : undefined
+      };
+      const newVenue = await venuesApi.create(venueData);
+      
+      // Add it to the season
+      await seasonsApi.addVenue(selectedSeason._id, newVenue._id);
+      
+      // Refresh venues and all venues list
+      await fetchVenues();
+      const updatedAllVenues = await venuesApi.getAll();
+      setAllVenues(updatedAllVenues);
+      
+      // Reset form and close dialog
+      setNewVenueData({
+        name: '',
+        address: {
+          street: '',
+          city: '',
+          state: '',
+          zipCode: '',
+          country: 'USA'
+        },
+        capacity: '',
+        surface: 'Grass',
+        amenities: [],
+        contact: {
+          name: '',
+          phone: '',
+          email: ''
+        },
+        notes: ''
+      });
+      setShowCreateVenueDialog(false);
+    } catch (error) {
+      console.error('Error creating venue:', error);
+      alert('Error creating venue. Please try again.');
     }
   };
 
@@ -435,7 +574,7 @@ const LeagueDetail: React.FC = () => {
           <Typography variant="body1" color="textSecondary">
             {league.description}
           </Typography>
-          )}
+        )}
           <Box display="flex" gap={1} mt={2} flexWrap="wrap" alignItems="center">
             <Chip
               label={league.isMember ? 'Member' : 'Not a member'}
@@ -478,6 +617,7 @@ const LeagueDetail: React.FC = () => {
                   // Refresh teams and games when season changes
                   await fetchTeams();
                   await fetchGames();
+                  await fetchVenues();
                 }}
                 renderInput={(params) => (
                   <TextField
@@ -501,22 +641,14 @@ const LeagueDetail: React.FC = () => {
             )}
           </Box>
         </Box>
-        {league.isOwner && (
+        {league.isOwner && seasons.length === 0 && (
           <Box display="flex" gap={1}>
             <Button
-              variant="outlined"
-              startIcon={<Edit />}
-              onClick={() => setShowEditDialog(true)}
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => setShowCreateSeasonDialog(true)}
             >
-              Edit
-            </Button>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<Delete />}
-              onClick={handleDelete}
-            >
-              Delete
+              New Season
             </Button>
           </Box>
         )}
@@ -527,7 +659,9 @@ const LeagueDetail: React.FC = () => {
           <Tab label="Overview" />
           <Tab label="Teams" />
           <Tab label="Games" />
+          <Tab label="Venues" />
           <Tab label="Members" />
+          {league.isOwner && <Tab label="Settings" />}
         </Tabs>
       </Card>
 
@@ -540,7 +674,7 @@ const LeagueDetail: React.FC = () => {
                   League Information
                 </Typography>
                 <Box mt={2}>
-                  <Typography variant="body2" color="textSecondary">
+                <Typography variant="body2" color="textSecondary">
                     Owner
                   </Typography>
                   <Typography variant="body1">
@@ -617,8 +751,8 @@ const LeagueDetail: React.FC = () => {
                                     season.status === 'registration' ? 'primary' :
                                     season.status === 'completed' ? 'default' :
                                     'warning'
-                                  }
-                                />
+                              }
+                            />
                               </Box>
                             }
                             secondary={
@@ -674,19 +808,19 @@ const LeagueDetail: React.FC = () => {
                       View All Seasons
                     </Button>
                   </Box>
-                )}
+              )}
             </CardContent>
           </Card>
-          </Grid>
+        </Grid>
         </Grid>
       )}
 
       {tabValue === 1 && (
-        <Card>
-          <CardContent>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Card>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="h6">Teams ({teams.length})</Typography>
-              {league.isOwner && (
+                {league.isOwner && (
                   <Button
                     variant="contained"
                     startIcon={<Add />}
@@ -902,6 +1036,7 @@ const LeagueDetail: React.FC = () => {
                           <TableCell>Venue</TableCell>
                           <TableCell>Status</TableCell>
                           <TableCell>Score</TableCell>
+                          {(league.isMember || league.isOwner) && <TableCell>Actions</TableCell>}
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -932,13 +1067,15 @@ const LeagueDetail: React.FC = () => {
                               </TableCell>
                               <TableCell>
                                 <Chip
-                                  label={game.status}
+                                  label={game.status === 'pending' ? 'Pending' : game.status}
                                   size="small"
                                   color={
                                     game.status === 'completed'
                                       ? 'success'
                                       : game.status === 'in_progress'
                                       ? 'warning'
+                                      : game.status === 'pending'
+                                      ? 'info'
                                       : game.status === 'cancelled' || game.status === 'postponed'
                                       ? 'error'
                                       : 'default'
@@ -950,6 +1087,24 @@ const LeagueDetail: React.FC = () => {
                                   ? `${game.score.homeTeam} - ${game.score.awayTeam}`
                                   : '—'}
                               </TableCell>
+                              {(league.isMember || league.isOwner) && (
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  {game.status === 'pending' && (
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        // Navigate to game detail page or open edit dialog
+                                        window.location.href = `/games/${game._id}`;
+                                      }}
+                                    >
+                                      Set Venue & Time
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              )}
                             </TableRow>
                           ))}
                       </TableBody>
@@ -963,10 +1118,111 @@ const LeagueDetail: React.FC = () => {
       )}
 
       {tabValue === 3 && (
+        <Card>
+          <CardContent>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">
+                Venues {selectedSeason ? `for ${selectedSeason.name}` : ''}
+              </Typography>
+              {selectedSeason && (league.isMember || league.isOwner) ? (
+                <Box display="flex" gap={1}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<Add />}
+                    onClick={() => setShowCreateVenueDialog(true)}
+                  >
+                    Create Venue
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => setShowAddVenueDialog(true)}
+                  >
+                    Add Existing Venue
+                  </Button>
+                </Box>
+              ) : selectedSeason ? (
+                <Typography variant="body2" color="textSecondary">
+                  Only league members can manage venues
+                </Typography>
+              ) : null}
+            </Box>
+            {!selectedSeason ? (
+              <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
+                Please select a season to view and manage venues.
+              </Typography>
+            ) : venues.length === 0 ? (
+              <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
+                No venues associated with this season.
+              </Typography>
+            ) : (
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Name</TableCell>
+                      <TableCell>Address</TableCell>
+                      <TableCell>Capacity</TableCell>
+                      <TableCell>Surface</TableCell>
+                      {(league.isMember || league.isOwner) && <TableCell>Actions</TableCell>}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {venues.map((venue) => (
+                      <TableRow key={venue._id}>
+                        <TableCell>
+                          <Typography variant="body1" fontWeight="medium">
+                            {venue.name}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          {venue.fullAddress || (
+                            <Box>
+                              {venue.address?.street && (
+                                <Typography variant="body2">{venue.address.street}</Typography>
+                              )}
+                              <Typography variant="body2" color="textSecondary">
+                                {[
+                                  venue.address?.city,
+                                  venue.address?.state,
+                                  venue.address?.zipCode
+                                ].filter(Boolean).join(', ')}
+                              </Typography>
+                            </Box>
+                          )}
+                        </TableCell>
+                        <TableCell>{venue.capacity || '—'}</TableCell>
+                        <TableCell>
+                          {venue.surface && (
+                            <Chip label={venue.surface} size="small" />
+                          )}
+                        </TableCell>
+                        {(league.isMember || league.isOwner) && (
+                          <TableCell>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleRemoveVenue(venue._id)}
+                            >
+                              <Delete />
+                            </IconButton>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tabValue === 4 && (
           <Card>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6">Members ({league.memberCount})</Typography>
+              <Typography variant="h6">Members & Players</Typography>
                 {league.isOwner && (
                   <Button
                   variant="contained"
@@ -977,58 +1233,333 @@ const LeagueDetail: React.FC = () => {
                   </Button>
                 )}
               </Box>
+              
+              {/* League Members Section */}
+              <Box mb={4}>
+                <Typography variant="h6" gutterBottom>League Members</Typography>
               <List>
                 <ListItem>
                   <ListItemAvatar>
-                  <Avatar sx={{ bgcolor: 'secondary.main' }}>
+                    <Avatar sx={{ bgcolor: 'secondary.main' }}>
                       {league.owner.firstName[0]}{league.owner.lastName[0]}
                     </Avatar>
                   </ListItemAvatar>
                   <ListItemText
                     primary={`${league.owner.firstName} ${league.owner.lastName}`}
-                  secondary={league.owner.email}
-                />
-                <Chip label="Owner" color="secondary" size="small" />
+                    secondary={league.owner.email}
+                  />
+                  <Chip label="Owner" color="secondary" size="small" />
                 </ListItem>
-              {league.members && league.members.length > 0 && <Divider sx={{ my: 1 }} />}
-              {league.members && league.members.length > 0 ? (
-                league.members.map((member, index) => (
-                  <React.Fragment key={member._id}>
-                    <ListItem>
+                {league.members && league.members.length > 0 && <Divider sx={{ my: 1 }} />}
+                {league.members && league.members.length > 0 ? (
+                  league.members.map((member, index) => (
+                    <React.Fragment key={member._id}>
+                      <ListItem>
                     <ListItemAvatar>
                       <Avatar>
-                          {member.firstName?.[0]}{member.lastName?.[0]}
+                            {member.firstName?.[0]}{member.lastName?.[0]}
                       </Avatar>
                     </ListItemAvatar>
                     <ListItemText
                       primary={`${member.firstName} ${member.lastName}`}
                       secondary={member.email}
                     />
-                      {league.isOwner && (
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleRemoveMember(member._id)}
-                        >
-                          <Delete />
-                        </IconButton>
-                      )}
+                        {league.isOwner && (
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleRemoveMember(member._id)}
+                          >
+                            <Delete />
+                          </IconButton>
+                        )}
                   </ListItem>
-                    {index < league.members.length - 1 && <Divider />}
-                  </React.Fragment>
-                ))
-              ) : (
-                <ListItem>
-                  <ListItemText
-                    primary="No additional members"
-                    secondary="Only the owner is a member of this league"
-                    sx={{ textAlign: 'center', py: 2 }}
-                    />
-                  </ListItem>
-              )}
+                      {index < league.members.length - 1 && <Divider />}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <ListItem>
+                    <ListItemText
+                      primary="No additional members"
+                      secondary="Only the owner is a member of this league"
+                      sx={{ textAlign: 'center', py: 2 }}
+                      />
+                    </ListItem>
+                )}
               </List>
+              </Box>
+
+              {/* Players from Teams Section */}
+              <Box>
+                <Typography variant="h6" gutterBottom>Players from Teams ({players.length})</Typography>
+                {players.length === 0 ? (
+                  <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
+                    No players found in teams for this league.
+                  </Typography>
+                ) : (
+                  <TableContainer component={Paper}>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Name</TableCell>
+                          <TableCell>Team</TableCell>
+                          <TableCell>Position</TableCell>
+                          <TableCell>Jersey #</TableCell>
+                          <TableCell>Email</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {players.map((player) => (
+                          <TableRow
+                            key={player._id}
+                            component={Link}
+                            to={`/players/${player._id}`}
+                            sx={{
+                              textDecoration: 'none',
+                              cursor: 'pointer',
+                              '&:hover': { backgroundColor: 'action.hover' }
+                            }}
+                          >
+                            <TableCell>
+                              <Box display="flex" alignItems="center" gap={1}>
+                                <Avatar sx={{ width: 32, height: 32 }}>
+                                  {player.firstName[0]}{player.lastName[0]}
+                                </Avatar>
+                                <Typography variant="body2">
+                                  {player.firstName} {player.lastName}
+                                </Typography>
+                                {player.isCaptain && (
+                                  <Chip label="C" size="small" color="primary" />
+                                )}
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              {typeof player.team === 'object' && player.team
+                                ? `${player.team.name} (${player.team.city})`
+                                : '—'}
+                            </TableCell>
+                            <TableCell>{player.position}</TableCell>
+                            <TableCell>{player.jerseyNumber || '—'}</TableCell>
+                            <TableCell>{player.email}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
             </CardContent>
           </Card>
+      )}
+
+      {tabValue === 5 && league.isOwner && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Settings
+            </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+              Manage league and season settings. These actions are only available to league owners.
+            </Typography>
+
+            <Box display="flex" flexDirection="column" gap={2}>
+              {/* Edit League */}
+              <Card variant="outlined">
+                <CardContent>
+                  <Box display="flex" justifyContent="space-between" alignItems="center">
+                    <Box>
+                      <Typography variant="h6" gutterBottom>
+                        Edit League
+                      </Typography>
+                      <Typography variant="body2" color="textSecondary">
+                        Update league name, description, and visibility settings.
+                      </Typography>
+                    </Box>
+                    <Button
+                      variant="outlined"
+                      startIcon={<Edit />}
+                      onClick={() => setShowEditDialog(true)}
+                    >
+                      Edit League
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+
+              {/* Delete League */}
+              <Card variant="outlined" sx={{ borderColor: 'error.main' }}>
+                <CardContent>
+                  <Box display="flex" justifyContent="space-between" alignItems="center">
+                    <Box>
+                      <Typography variant="h6" gutterBottom color="error">
+                        Delete League
+                      </Typography>
+                      <Typography variant="body2" color="textSecondary">
+                        Permanently delete this league and all associated seasons and games. This action cannot be undone.
+                      </Typography>
+                    </Box>
+                    <Button
+                      variant="contained"
+                      color="error"
+                      startIcon={<Delete />}
+                      onClick={handleDelete}
+                    >
+                      Delete League
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+
+              {/* Season Settings Section */}
+              {selectedSeason && (
+                <>
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="h6" gutterBottom>
+                    Season Settings: {selectedSeason.name}
+                  </Typography>
+              {/* Complete Season */}
+              {selectedSeason.status === 'active' && (
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Box>
+                        <Typography variant="h6" gutterBottom>
+                          Complete Season
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary">
+                          Mark this season as completed. This will finalize standings and prevent further changes.
+                        </Typography>
+                      </Box>
+                      <Button
+                        variant="contained"
+                        color="secondary"
+                        onClick={async () => {
+                          if (window.confirm(`Are you sure you want to complete the season "${selectedSeason.name}"? This action cannot be undone.`)) {
+                            try {
+                              await seasonsApi.complete(selectedSeason._id);
+                              await fetchSeasons();
+                              alert('Season completed successfully!');
+                            } catch (error) {
+                              console.error('Error completing season:', error);
+                              alert('Error completing season. Please try again.');
+                            }
+                          }
+                        }}
+                      >
+                        Complete Season
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Regenerate Schedule */}
+              {(selectedSeason.status === 'draft' || selectedSeason.status === 'registration') && (
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Box>
+                        <Typography variant="h6" gutterBottom>
+                          Regenerate Schedule
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary">
+                          Delete all existing games and regenerate the schedule. This will remove all current game assignments.
+                        </Typography>
+                      </Box>
+                      <Button
+                        variant="contained"
+                        color="warning"
+                        onClick={async () => {
+                          if (window.confirm(`Are you sure you want to regenerate the schedule for "${selectedSeason.name}"? This will delete all existing games and create a new schedule. This action cannot be undone.`)) {
+                            try {
+                              await seasonsApi.regenerateSchedule(selectedSeason._id);
+                              await fetchSeasons();
+                              await fetchGames();
+                              if (selectedSeason) {
+                                const fullSeason = await seasonsApi.getById(selectedSeason._id);
+                                setSeasonWithWeeks(fullSeason);
+                                setSelectedWeek(1);
+                              }
+                              alert('Schedule regenerated successfully!');
+                            } catch (error) {
+                              console.error('Error regenerating schedule:', error);
+                              alert('Error regenerating schedule. Please try again.');
+                            }
+                          }
+                        }}
+                      >
+                        Regenerate Schedule
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Delete Season */}
+              {selectedSeason.status !== 'active' && (
+                <Card variant="outlined" sx={{ borderColor: 'error.main' }}>
+                  <CardContent>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Box>
+                        <Typography variant="h6" gutterBottom color="error">
+                          Delete Season
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary">
+                          Permanently delete this season and all associated games. This action cannot be undone.
+                        </Typography>
+                      </Box>
+                      <Button
+                        variant="contained"
+                        color="error"
+                        onClick={async () => {
+                          const confirmMessage = `Are you absolutely sure you want to delete the season "${selectedSeason.name}"? This will permanently delete:\n\n- The season\n- All games associated with this season\n\nThis action CANNOT be undone.`;
+                          if (window.confirm(confirmMessage)) {
+                            const doubleConfirm = window.confirm('This is your last chance. Type "DELETE" to confirm (or click OK to proceed).');
+                            if (doubleConfirm) {
+                              try {
+                                await seasonsApi.deleteSeason(selectedSeason._id);
+                                await fetchSeasons();
+                                // Clear selected season if it was deleted
+                                if (seasons.length > 1) {
+                                  const remainingSeasons = seasons.filter(s => s._id !== selectedSeason._id);
+                                  if (remainingSeasons.length > 0) {
+                                    setSelectedSeason(remainingSeasons[0]);
+                                  } else {
+                                    setSelectedSeason(null);
+                                  }
+                                } else {
+                                  setSelectedSeason(null);
+                                }
+                                alert('Season deleted successfully!');
+                              } catch (error) {
+                                console.error('Error deleting season:', error);
+                                alert('Error deleting season. Please try again.');
+                              }
+                            }
+                          }
+                        }}
+                      >
+                        Delete Season
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              )}
+                </>
+              )}
+
+              {!selectedSeason && (
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 2 }}>
+                      Please select a season to manage season-specific settings.
+                    </Typography>
+                  </CardContent>
+                </Card>
+              )}
+            </Box>
+          </CardContent>
+        </Card>
       )}
 
       {/* Edit Dialog */}
@@ -1074,6 +1605,354 @@ const LeagueDetail: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowAddMemberDialog(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add Venue Dialog */}
+      <Dialog open={showAddVenueDialog} onClose={() => {
+        setShowAddVenueDialog(false);
+        setSelectedVenueForAdd(null);
+      }} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Existing Venue to Season</DialogTitle>
+        <DialogContent>
+          <Autocomplete
+            options={allVenues.filter(v => !venues.some(ev => ev._id === v._id))}
+            getOptionLabel={(option) => option.name}
+            value={selectedVenueForAdd}
+            onChange={(_, newValue) => setSelectedVenueForAdd(newValue)}
+            renderInput={(params) => (
+          <TextField
+                {...params}
+                label="Select Venue"
+                margin="normal"
+            fullWidth
+              />
+            )}
+            renderOption={(props, option) => (
+              <Box component="li" {...props} key={option._id}>
+                <Box>
+                  <Typography variant="body1">{option.name}</Typography>
+                  {option.fullAddress && (
+                    <Typography variant="body2" color="textSecondary">
+                      {option.fullAddress}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            )}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setShowAddVenueDialog(false);
+            setSelectedVenueForAdd(null);
+          }}>Cancel</Button>
+          <Button
+            onClick={handleAddVenue}
+            variant="contained"
+            disabled={!selectedVenueForAdd}
+          >
+            Add
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Season Dialog */}
+      <Dialog open={showCreateSeasonDialog} onClose={() => {
+        setShowCreateSeasonDialog(false);
+        setNewSeasonData({
+          name: '',
+          description: '',
+          startDate: '',
+          endDate: '',
+        });
+      }} maxWidth="sm" fullWidth>
+        <DialogTitle>Create New Season</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Season Name"
+            value={newSeasonData.name}
+            onChange={(e) => setNewSeasonData({ ...newSeasonData, name: e.target.value })}
+            required
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            label="Description (Optional)"
+            value={newSeasonData.description}
+            onChange={(e) => setNewSeasonData({ ...newSeasonData, description: e.target.value })}
+            margin="normal"
+            multiline
+            rows={2}
+          />
+          <TextField
+            fullWidth
+            label="Start Date"
+            type="date"
+            value={newSeasonData.startDate}
+            onChange={(e) => setNewSeasonData({ ...newSeasonData, startDate: e.target.value })}
+            required
+            margin="normal"
+            InputLabelProps={{
+              shrink: true,
+            }}
+          />
+          <TextField
+            fullWidth
+            label="End Date"
+            type="date"
+            value={newSeasonData.endDate}
+            onChange={(e) => setNewSeasonData({ ...newSeasonData, endDate: e.target.value })}
+            required
+            margin="normal"
+            InputLabelProps={{
+              shrink: true,
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setShowCreateSeasonDialog(false);
+            setNewSeasonData({
+              name: '',
+              description: '',
+              startDate: '',
+              endDate: '',
+            });
+          }}>Cancel</Button>
+          <Button
+            onClick={async () => {
+              if (!id || !newSeasonData.name || !newSeasonData.startDate || !newSeasonData.endDate) {
+                alert('Please fill in all required fields.');
+                return;
+              }
+              try {
+                const startDate = new Date(newSeasonData.startDate).toISOString();
+                const endDate = new Date(newSeasonData.endDate).toISOString();
+                
+                await seasonsApi.create({
+                  name: newSeasonData.name,
+                  description: newSeasonData.description || undefined,
+                  league: id,
+                  startDate: startDate,
+                  endDate: endDate,
+                  teams: [],
+                });
+                
+                await fetchSeasons();
+                setShowCreateSeasonDialog(false);
+                setNewSeasonData({
+                  name: '',
+                  description: '',
+                  startDate: '',
+                  endDate: '',
+                });
+                alert('Season created successfully!');
+              } catch (error) {
+                console.error('Error creating season:', error);
+                alert('Error creating season. Please try again.');
+              }
+            }}
+            variant="contained"
+            disabled={!newSeasonData.name || !newSeasonData.startDate || !newSeasonData.endDate}
+          >
+            Create Season
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Venue Dialog */}
+      <Dialog open={showCreateVenueDialog} onClose={() => {
+        setShowCreateVenueDialog(false);
+        setNewVenueData({
+          name: '',
+          address: {
+            street: '',
+            city: '',
+            state: '',
+            zipCode: '',
+            country: 'USA'
+          },
+          capacity: '',
+          surface: 'Grass',
+          amenities: [],
+          contact: {
+            name: '',
+            phone: '',
+            email: ''
+          },
+          notes: ''
+        });
+      }} maxWidth="md" fullWidth>
+        <DialogTitle>Create New Venue</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Venue Name"
+            value={newVenueData.name}
+            onChange={(e) => setNewVenueData({ ...newVenueData, name: e.target.value })}
+            required
+            margin="normal"
+          />
+          <Box mt={2}>
+            <Typography variant="subtitle2" gutterBottom>Address</Typography>
+            <TextField
+              fullWidth
+              label="Street"
+              value={newVenueData.address.street}
+              onChange={(e) => setNewVenueData({
+                ...newVenueData,
+                address: { ...newVenueData.address, street: e.target.value }
+              })}
+              margin="normal"
+            />
+            <Box display="flex" gap={2}>
+              <TextField
+                fullWidth
+                label="City"
+                value={newVenueData.address.city}
+                onChange={(e) => setNewVenueData({
+                  ...newVenueData,
+                  address: { ...newVenueData.address, city: e.target.value }
+                })}
+                required
+                margin="normal"
+              />
+              <TextField
+                fullWidth
+                label="State"
+                value={newVenueData.address.state}
+                onChange={(e) => setNewVenueData({
+                  ...newVenueData,
+                  address: { ...newVenueData.address, state: e.target.value }
+                })}
+                margin="normal"
+              />
+              <TextField
+                fullWidth
+                label="Zip Code"
+                value={newVenueData.address.zipCode}
+                onChange={(e) => setNewVenueData({
+                  ...newVenueData,
+                  address: { ...newVenueData.address, zipCode: e.target.value }
+                })}
+                margin="normal"
+              />
+            </Box>
+            <TextField
+              fullWidth
+              label="Country"
+              value={newVenueData.address.country}
+              onChange={(e) => setNewVenueData({
+                ...newVenueData,
+                address: { ...newVenueData.address, country: e.target.value }
+              })}
+              margin="normal"
+            />
+          </Box>
+          <Box display="flex" gap={2} mt={2}>
+            <TextField
+              fullWidth
+              label="Capacity"
+              type="number"
+              value={newVenueData.capacity}
+              onChange={(e) => setNewVenueData({ ...newVenueData, capacity: e.target.value })}
+              margin="normal"
+            />
+            <TextField
+              fullWidth
+              select
+              label="Surface"
+              value={newVenueData.surface}
+              onChange={(e) => setNewVenueData({ ...newVenueData, surface: e.target.value })}
+              margin="normal"
+              SelectProps={{
+                native: true,
+              }}
+            >
+              <option value="Grass">Grass</option>
+              <option value="Artificial Turf">Artificial Turf</option>
+              <option value="Indoor">Indoor</option>
+              <option value="Other">Other</option>
+            </TextField>
+          </Box>
+          <Box mt={2}>
+            <Typography variant="subtitle2" gutterBottom>Contact Information (Optional)</Typography>
+            <TextField
+              fullWidth
+              label="Contact Name"
+              value={newVenueData.contact.name}
+              onChange={(e) => setNewVenueData({
+                ...newVenueData,
+                contact: { ...newVenueData.contact, name: e.target.value }
+              })}
+              margin="normal"
+            />
+            <Box display="flex" gap={2}>
+              <TextField
+                fullWidth
+                label="Phone"
+                value={newVenueData.contact.phone}
+                onChange={(e) => setNewVenueData({
+                  ...newVenueData,
+                  contact: { ...newVenueData.contact, phone: e.target.value }
+                })}
+                margin="normal"
+              />
+              <TextField
+                fullWidth
+                label="Email"
+            type="email"
+                value={newVenueData.contact.email}
+                onChange={(e) => setNewVenueData({
+                  ...newVenueData,
+                  contact: { ...newVenueData.contact, email: e.target.value }
+                })}
+                margin="normal"
+              />
+            </Box>
+          </Box>
+          <TextField
+            fullWidth
+            label="Notes (Optional)"
+            value={newVenueData.notes}
+            onChange={(e) => setNewVenueData({ ...newVenueData, notes: e.target.value })}
+            margin="normal"
+            multiline
+            rows={3}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setShowCreateVenueDialog(false);
+            setNewVenueData({
+              name: '',
+              address: {
+                street: '',
+                city: '',
+                state: '',
+                zipCode: '',
+                country: 'USA'
+              },
+              capacity: '',
+              surface: 'Grass',
+              amenities: [],
+              contact: {
+                name: '',
+                phone: '',
+                email: ''
+              },
+              notes: ''
+            });
+          }}>Cancel</Button>
+          <Button
+            onClick={handleCreateVenue}
+            variant="contained"
+            disabled={!newVenueData.name || !newVenueData.address.city}
+          >
+            Create & Add to Season
+          </Button>
         </DialogActions>
       </Dialog>
 

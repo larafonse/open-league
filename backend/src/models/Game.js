@@ -26,15 +26,15 @@ const gameSchema = new mongoose.Schema({
   venue: {
     name: {
       type: String,
-      required: [true, 'Venue name is required']
+      default: 'TBD'
     },
     address: String,
     capacity: Number
   },
   status: {
     type: String,
-    enum: ['scheduled', 'in_progress', 'completed', 'cancelled', 'postponed'],
-    default: 'scheduled'
+    enum: ['pending', 'scheduled', 'in_progress', 'completed', 'cancelled', 'postponed'],
+    default: 'pending'
   },
   score: {
     homeTeam: {

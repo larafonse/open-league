@@ -389,5 +389,51 @@ router.get('/:id/teams', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/leagues/:id/players - Get all players from teams in a league
+router.get('/:id/players', authenticate, async (req, res) => {
+  try {
+    const league = await League.findById(req.params.id);
+
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+
+    // Allow access if league is public OR user is a member
+    if (!league.isPublic && !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to view players' });
+    }
+
+    // Get all seasons for this league
+    const seasons = await Season.find({ league: league._id }).select('teams');
+    
+    // Collect all unique team IDs from seasons
+    const teamIds = new Set();
+    seasons.forEach(season => {
+      if (season.teams && Array.isArray(season.teams)) {
+        season.teams.forEach(teamId => {
+          teamIds.add(teamId.toString());
+        });
+      }
+    });
+
+    // Also add teams directly associated with the league
+    if (league.teams && Array.isArray(league.teams)) {
+      league.teams.forEach(teamId => {
+        teamIds.add(teamId.toString());
+      });
+    }
+
+    // Get all players from these teams
+    const Player = require('../models/Player');
+    const players = await Player.find({ team: { $in: Array.from(teamIds) } })
+      .populate('team', 'name city')
+      .sort({ lastName: 1, firstName: 1 });
+
+    res.json(players);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching players', error: error.message });
+  }
+});
+
 module.exports = router;
 

@@ -108,6 +108,8 @@ export const leaguesApi = {
     api.get(`/leagues/${leagueId}/seasons`).then(res => res.data),
   getTeams: (leagueId: string): Promise<Team[]> => 
     api.get(`/leagues/${leagueId}/teams`).then(res => res.data),
+  getPlayers: (leagueId: string): Promise<Player[]> => 
+    api.get(`/leagues/${leagueId}/players`).then(res => res.data),
   addTeams: (leagueId: string, teamIds: string[]): Promise<League> => 
     api.post(`/leagues/${leagueId}/teams`, { teamIds }).then(res => res.data),
 };
@@ -120,7 +122,7 @@ export const seasonsApi = {
   create: (data: CreateSeasonData): Promise<Season> => api.post('/seasons', data).then(res => res.data),
   update: (id: string, data: Partial<CreateSeasonData & { status?: string }>): Promise<Season> => 
     api.put(`/seasons/${id}`, data).then(res => res.data),
-  delete: (id: string): Promise<void> => api.delete(`/seasons/${id}`).then(() => undefined),
+  deleteSeason: (id: string): Promise<void> => api.delete(`/seasons/${id}`).then(() => undefined),
   generateSchedule: (id: string): Promise<Season> => 
     api.post(`/seasons/${id}/generate-schedule`).then(res => res.data),
   start: (id: string): Promise<Season> => 
@@ -133,6 +135,14 @@ export const seasonsApi = {
     api.post(`/seasons/${id}/register-team`, { teamId }).then(res => res.data),
   getAvailableTeams: (id: string): Promise<Team[]> => 
     api.get(`/seasons/${id}/available-teams`).then(res => res.data),
+  getVenues: (id: string): Promise<any[]> => 
+    api.get(`/seasons/${id}/venues`).then(res => res.data),
+  addVenue: (id: string, venueId: string): Promise<any[]> => 
+    api.post(`/seasons/${id}/venues`, { venueId }).then(res => res.data),
+  removeVenue: (id: string, venueId: string): Promise<void> => 
+    api.delete(`/seasons/${id}/venues/${venueId}`).then(() => undefined),
+  regenerateSchedule: (id: string): Promise<Season> => 
+    api.post(`/seasons/${id}/regenerate-schedule`).then(res => res.data),
   getStandings: (id: string): Promise<any[]> => 
     api.get(`/seasons/${id}/standings`).then(res => res.data),
 };
@@ -163,6 +173,16 @@ export const authApi = {
     lastName: string;
     role: string;
   }> => api.get('/auth/me').then(res => res.data.user),
+};
+
+// Venues API
+export const venuesApi = {
+  getAll: (): Promise<any[]> => api.get('/venues').then(res => res.data),
+  getById: (id: string): Promise<any> => api.get(`/venues/${id}`).then(res => res.data),
+  create: (data: any): Promise<any> => api.post('/venues', data).then(res => res.data),
+  update: (id: string, data: any): Promise<any> => 
+    api.put(`/venues/${id}`, data).then(res => res.data),
+  delete: (id: string): Promise<void> => api.delete(`/venues/${id}`).then(() => undefined),
 };
 
 export default api;

@@ -56,6 +56,10 @@ const seasonSchema = new mongoose.Schema({
     enum: ['draft', 'registration', 'active', 'completed', 'cancelled'],
     default: 'draft'
   },
+  venues: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Venue'
+  }],
   settings: {
     gamesPerWeek: {
       type: Number,

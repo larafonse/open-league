@@ -171,7 +171,7 @@ router.put('/:id', [
   body('homeTeam').optional().isMongoId().withMessage('Valid home team ID is required'),
   body('awayTeam').optional().isMongoId().withMessage('Valid away team ID is required'),
   body('scheduledDate').optional().isISO8601().withMessage('Valid scheduled date is required'),
-  body('status').optional().isIn(['scheduled', 'in_progress', 'completed', 'cancelled', 'postponed'])
+  body('status').optional().isIn(['pending', 'scheduled', 'in_progress', 'completed', 'cancelled', 'postponed'])
     .withMessage('Valid status is required'),
   body('score.homeTeam').optional().isInt({ min: 0 }).withMessage('Home team score must be non-negative'),
   body('score.awayTeam').optional().isInt({ min: 0 }).withMessage('Away team score must be non-negative')
@@ -190,6 +190,12 @@ router.put('/:id', [
     
     if (!game) {
       return res.status(404).json({ message: 'Game not found' });
+    }
+
+    // If game is pending and venue/time are set, automatically change to scheduled
+    if (game.status === 'pending' && game.venue && game.venue.name && game.venue.name !== 'TBD' && game.scheduledDate) {
+      game.status = 'scheduled';
+      await game.save();
     }
 
     // If game is completed, update team statistics

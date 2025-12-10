@@ -59,7 +59,7 @@ export interface BaseGame {
     address?: string;
     capacity?: number;
   };
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'postponed';
+  status: 'pending' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'postponed';
   score: {
     homeTeam: number;
     awayTeam: number;

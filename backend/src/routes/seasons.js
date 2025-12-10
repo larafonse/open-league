@@ -498,13 +498,13 @@ router.post('/:id/generate-schedule', authenticate, async (req, res) => {
           season: season._id,
           homeTeam: matchup.home,
           awayTeam: matchup.away,
-          scheduledDate: new Date(weekStart.getTime() + (12 * 60 * 60 * 1000)), // 12 PM on week start
+          scheduledDate: new Date(weekStart.getTime() + (12 * 60 * 60 * 1000)), // 12 PM on week start (tentative)
           venue: {
             name: 'TBD',
             address: '',
             capacity: 0
           },
-          status: 'scheduled'
+          status: 'pending'
         });
         
         await game.save();
@@ -540,6 +540,102 @@ router.post('/:id/generate-schedule', authenticate, async (req, res) => {
     res.json(safeSerializeSeason(populatedSeason));
   } catch (error) {
     res.status(500).json({ message: 'Error generating schedule', error: error.message });
+  }
+});
+
+// POST /api/seasons/:id/regenerate-schedule - Regenerate season schedule (delete existing games and regenerate)
+router.post('/:id/regenerate-schedule', authenticate, async (req, res) => {
+  try {
+    const season = await Season.findById(req.params.id);
+    
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user is the owner of the league
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (league.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only the league owner can regenerate schedules' });
+    }
+
+    if (season.status === 'active') {
+      return res.status(400).json({ message: 'Cannot regenerate schedule for active season' });
+    }
+
+    if (!season.teams || season.teams.length < 2) {
+      return res.status(400).json({ message: 'At least 2 teams are required to generate schedule' });
+    }
+
+    // Delete all existing games for this season
+    await Game.deleteMany({ season: season._id });
+
+    // Clear existing weeks
+    season.weeks = [];
+
+    // Generate the schedule
+    season.generateSchedule();
+    await season.save();
+
+    // Create actual Game documents for each scheduled game
+    const schedule = season._scheduleData;
+    const weekDuration = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+    let currentWeekStart = new Date(season.startDate);
+
+    for (let weekIndex = 0; weekIndex < schedule.length; weekIndex++) {
+      const weekMatchups = schedule[weekIndex];
+      const weekStart = new Date(currentWeekStart);
+      const weekEnd = new Date(currentWeekStart.getTime() + weekDuration - 1);
+      
+      const week = season.weeks[weekIndex];
+      
+      for (let matchup of weekMatchups) {
+        const game = new Game({
+          season: season._id,
+          homeTeam: matchup.home,
+          awayTeam: matchup.away,
+          scheduledDate: new Date(weekStart.getTime() + (12 * 60 * 60 * 1000)), // 12 PM on week start (tentative)
+          venue: {
+            name: 'TBD',
+            address: '',
+            capacity: 0
+          },
+          status: 'pending'
+        });
+        
+        await game.save();
+        
+        // Add the game ID to the week's games array
+        week.games.push(game._id);
+      }
+      
+      currentWeekStart = new Date(weekEnd.getTime() + 1);
+    }
+
+    // Clear the temporary schedule data
+    delete season._scheduleData;
+    await season.save();
+    
+    // Log the created games for debugging
+    const totalGames = season.weeks.reduce((total, week) => total + (week.games?.length || 0), 0);
+    console.log(`Regenerated ${totalGames} games for season ${season.name}`);
+    
+    const populatedSeason = await Season.findById(season._id)
+      .populate('teams', 'name city colors')
+      .populate('standings.team', 'name city colors')
+      .populate({
+        path: 'weeks.games',
+        populate: {
+          path: 'homeTeam awayTeam',
+          select: 'name city colors'
+        }
+      });
+    
+    res.json(safeSerializeSeason(populatedSeason));
+  } catch (error) {
+    res.status(500).json({ message: 'Error regenerating schedule', error: error.message });
   }
 });
 
@@ -687,6 +783,113 @@ router.delete('/:id', authenticate, async (req, res) => {
     res.json({ message: 'Season deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting season', error: error.message });
+  }
+});
+
+// GET /api/seasons/:id/venues - Get venues for a season
+router.get('/:id/venues', authenticate, async (req, res) => {
+  try {
+    const season = await Season.findById(req.params.id)
+      .populate('venues');
+    
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user has access to the league
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isPublic && !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to view venues' });
+    }
+
+    res.json(season.venues || []);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching venues', error: error.message });
+  }
+});
+
+// POST /api/seasons/:id/venues - Add venue to season
+router.post('/:id/venues', authenticate, [
+  body('venueId').isMongoId().withMessage('Valid venue ID is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const season = await Season.findById(req.params.id);
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user is a member of the league
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to manage venues' });
+    }
+
+    const { venueId } = req.body;
+
+    // Verify venue exists
+    const Venue = require('../models/Venue');
+    const venue = await Venue.findById(venueId);
+    if (!venue) {
+      return res.status(404).json({ message: 'Venue not found' });
+    }
+
+    // Check if venue is already added
+    if (season.venues && season.venues.includes(venueId)) {
+      return res.status(400).json({ message: 'Venue is already associated with this season' });
+    }
+
+    // Add venue to season
+    season.venues = season.venues || [];
+    season.venues.push(venueId);
+    await season.save();
+
+    const populatedSeason = await Season.findById(season._id)
+      .populate('venues')
+      .populate('league', 'name');
+
+    res.json(populatedSeason.venues);
+  } catch (error) {
+    res.status(500).json({ message: 'Error adding venue to season', error: error.message });
+  }
+});
+
+// DELETE /api/seasons/:id/venues/:venueId - Remove venue from season
+router.delete('/:id/venues/:venueId', authenticate, async (req, res) => {
+  try {
+    const season = await Season.findById(req.params.id);
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user is a member of the league
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to manage venues' });
+    }
+
+    const { venueId } = req.params;
+
+    // Remove venue from season
+    season.venues = (season.venues || []).filter(v => v.toString() !== venueId);
+    await season.save();
+
+    res.json({ message: 'Venue removed from season successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error removing venue from season', error: error.message });
   }
 });
 
