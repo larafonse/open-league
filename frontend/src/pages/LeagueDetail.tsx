@@ -580,7 +580,7 @@ const LeagueDetail: React.FC = () => {
               label={league.isMember ? 'Member' : 'Not a member'}
               color={league.isMember ? 'primary' : 'default'}
             />
-            {league.isOwner && (
+                {league.isOwner && (
               <Chip label="Owner" color="secondary" />
             )}
             <Chip
@@ -641,8 +641,8 @@ const LeagueDetail: React.FC = () => {
             )}
           </Box>
         </Box>
-        {league.isOwner && seasons.length === 0 && (
-          <Box display="flex" gap={1}>
+        <Box display="flex" gap={1}>
+          {league.isOwner && seasons.length === 0 && (
             <Button
               variant="contained"
               startIcon={<Add />}
@@ -650,8 +650,18 @@ const LeagueDetail: React.FC = () => {
             >
               New Season
             </Button>
-          </Box>
-        )}
+          )}
+          {selectedSeason && selectedSeason.status === 'registration' && (league.isMember || league.isOwner) && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Add />}
+              onClick={() => setShowRegisterDialog(true)}
+            >
+              Register
+                  </Button>
+                )}
+              </Box>
       </Box>
 
           <Card sx={{ mb: 3 }}>

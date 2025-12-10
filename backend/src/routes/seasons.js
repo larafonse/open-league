@@ -363,7 +363,7 @@ router.post('/', authenticate, [
   body('league').notEmpty().withMessage('League is required'),
   body('startDate').isISO8601().withMessage('Valid start date is required'),
   body('endDate').isISO8601().withMessage('Valid end date is required'),
-  body('teams').isArray({ min: 2 }).withMessage('At least 2 teams are required')
+  body('teams').optional({ nullable: true, checkFalsy: true }).isArray().withMessage('Teams must be an array')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -388,13 +388,23 @@ router.post('/', authenticate, [
       return res.status(400).json({ message: 'End date must be after start date' });
     }
 
-    // Validate teams exist
-    const teams = await Team.find({ _id: { $in: req.body.teams } });
-    if (teams.length !== req.body.teams.length) {
-      return res.status(400).json({ message: 'One or more teams not found' });
+    // Validate teams exist (if provided)
+    const teamsArray = req.body.teams || [];
+    if (teamsArray.length > 0) {
+      const teams = await Team.find({ _id: { $in: teamsArray } });
+      if (teams.length !== teamsArray.length) {
+        return res.status(400).json({ message: 'One or more teams not found' });
+      }
     }
 
-    const season = new Season(req.body);
+    // Create season with registration status by default
+    const seasonData = {
+      ...req.body,
+      teams: teamsArray,
+      status: req.body.status || 'registration'
+    };
+
+    const season = new Season(seasonData);
     await season.save();
     
     const populatedSeason = await Season.findById(season._id)
