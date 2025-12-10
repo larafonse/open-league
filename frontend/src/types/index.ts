@@ -81,6 +81,8 @@ export interface BaseGame {
 
 export interface BaseGameEvent {
   type: 'goal' | 'assist' | 'yellow_card' | 'red_card' | 'substitution' | 'penalty' | 'own_goal';
+  player?: BasePlayer | string;
+  team?: BaseTeam | string;
   minute: number;
   description?: string;
   timestamp: string;

@@ -32,6 +32,10 @@ import {
   TableHead,
   TableRow,
   Paper,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import {
   Public,
@@ -74,9 +78,14 @@ const LeagueDetail: React.FC = () => {
     scheduledTime: '',
   });
   const [showScoreDialog, setShowScoreDialog] = useState(false);
-  const [gameScoreData, setGameScoreData] = useState({
-    homeTeam: 0,
-    awayTeam: 0,
+  const [homeTeamPlayers, setHomeTeamPlayers] = useState<Player[]>([]);
+  const [awayTeamPlayers, setAwayTeamPlayers] = useState<Player[]>([]);
+  const [newEventData, setNewEventData] = useState({
+    type: 'goal' as 'goal' | 'yellow_card' | 'red_card' | 'own_goal',
+    player: '',
+    team: '',
+    minute: 0,
+    description: '',
   });
   const [newSeasonData, setNewSeasonData] = useState({
     name: '',
@@ -1201,18 +1210,41 @@ const LeagueDetail: React.FC = () => {
                                         size="small"
                                         variant="contained"
                                         color="warning"
-                                        onClick={(e) => {
+                                        onClick={async (e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
                                           setSelectedGame(game);
-                                          setGameScoreData({
-                                            homeTeam: game.score?.homeTeam || 0,
-                                            awayTeam: game.score?.awayTeam || 0,
-                                          });
-                                          setShowScoreDialog(true);
+                                          
+                                          // Fetch players for both teams
+                                          try {
+                                            const homeTeamId = typeof game.homeTeam === 'object' ? game.homeTeam._id : game.homeTeam;
+                                            const awayTeamId = typeof game.awayTeam === 'object' ? game.awayTeam._id : game.awayTeam;
+                                            
+                                            const [homePlayers, awayPlayers] = await Promise.all([
+                                              playersApi.getAll({ team: homeTeamId }),
+                                              playersApi.getAll({ team: awayTeamId }),
+                                            ]);
+                                            
+                                            setHomeTeamPlayers(homePlayers);
+                                            setAwayTeamPlayers(awayPlayers);
+                                            
+                                            // Set default team to home team
+                                            setNewEventData({
+                                              type: 'goal',
+                                              player: '',
+                                              team: homeTeamId,
+                                              minute: 0,
+                                              description: '',
+                                            });
+                                            
+                                            setShowScoreDialog(true);
+                                          } catch (error) {
+                                            console.error('Error fetching players:', error);
+                                            alert('Error loading players. Please try again.');
+                                          }
                                         }}
                                       >
-                                        Update Score
+                                        Manage Game
                                       </Button>
                                     )}
                                   </Box>
@@ -2780,68 +2812,214 @@ const LeagueDetail: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Update Score Dialog */}
+      {/* Manage Game Events Dialog */}
       <Dialog 
         open={showScoreDialog} 
         onClose={() => {
           setShowScoreDialog(false);
           setSelectedGame(null);
-          setGameScoreData({
-            homeTeam: 0,
-            awayTeam: 0,
+          setHomeTeamPlayers([]);
+          setAwayTeamPlayers([]);
+          setNewEventData({
+            type: 'goal',
+            player: '',
+            team: '',
+            minute: 0,
+            description: '',
           });
         }} 
-        maxWidth="sm" 
+        maxWidth="md" 
         fullWidth
       >
         <DialogTitle>
-          Update Score {selectedGame && `- ${typeof selectedGame.homeTeam === 'object' ? selectedGame.homeTeam.name : 'Home'} vs ${typeof selectedGame.awayTeam === 'object' ? selectedGame.awayTeam.name : 'Away'}`}
+          Manage Game {selectedGame && `- ${typeof selectedGame.homeTeam === 'object' ? selectedGame.homeTeam.name : 'Home'} vs ${typeof selectedGame.awayTeam === 'object' ? selectedGame.awayTeam.name : 'Away'}`}
         </DialogTitle>
         <DialogContent>
-          <Box sx={{ mt: 2 }}>
-            <Box display="flex" alignItems="center" gap={2} mb={3}>
-              <Box flex={1}>
-                <Typography variant="body2" color="textSecondary" gutterBottom>
-                  {typeof selectedGame?.homeTeam === 'object' ? selectedGame.homeTeam.name : 'Home Team'}
-                </Typography>
-                <TextField
-                  fullWidth
-                  label="Score"
-                  type="number"
-                  value={gameScoreData.homeTeam}
-                  onChange={(e) => setGameScoreData({ ...gameScoreData, homeTeam: parseInt(e.target.value) || 0 })}
-                  inputProps={{ min: 0 }}
-                  margin="normal"
-                />
+          {selectedGame && (
+            <Box sx={{ mt: 2 }}>
+              {/* Current Score Display */}
+              <Box display="flex" alignItems="center" justifyContent="center" gap={3} mb={3} p={2} sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
+                <Box textAlign="center">
+                  <Typography variant="h4" fontWeight="bold">
+                    {selectedGame.score?.homeTeam || 0}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    {typeof selectedGame.homeTeam === 'object' ? selectedGame.homeTeam.name : 'Home'}
+                  </Typography>
+                </Box>
+                <Typography variant="h4">-</Typography>
+                <Box textAlign="center">
+                  <Typography variant="h4" fontWeight="bold">
+                    {selectedGame.score?.awayTeam || 0}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    {typeof selectedGame.awayTeam === 'object' ? selectedGame.awayTeam.name : 'Away'}
+                  </Typography>
+                </Box>
               </Box>
-              <Typography variant="h4" sx={{ mt: 3 }}>
-                -
+
+              {/* Current Events */}
+              {selectedGame.events && selectedGame.events.length > 0 && (
+                <Box mb={3}>
+                  <Typography variant="h6" gutterBottom>
+                    Game Events
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Minute</TableCell>
+                          <TableCell>Type</TableCell>
+                          <TableCell>Player</TableCell>
+                          <TableCell>Team</TableCell>
+                          <TableCell>Description</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {selectedGame.events
+                          .sort((a: any, b: any) => (a.minute || 0) - (b.minute || 0))
+                          .map((event: any, idx: number) => (
+                            <TableRow key={idx}>
+                              <TableCell>{event.minute}'</TableCell>
+                              <TableCell>
+                                <Chip
+                                  label={event.type.replace('_', ' ')}
+                                  size="small"
+                                  color={
+                                    event.type === 'goal' || event.type === 'own_goal'
+                                      ? 'success'
+                                      : event.type === 'yellow_card'
+                                      ? 'warning'
+                                      : event.type === 'red_card'
+                                      ? 'error'
+                                      : 'default'
+                                  }
+                                />
+                              </TableCell>
+                              <TableCell>
+                                {typeof event.player === 'object' && event.player
+                                  ? `${event.player.firstName} ${event.player.lastName}${event.player.jerseyNumber ? ` (#${event.player.jerseyNumber})` : ''}`
+                                  : '—'}
+                              </TableCell>
+                              <TableCell>
+                                {typeof event.team === 'object' && event.team
+                                  ? event.team.name
+                                  : '—'}
+                              </TableCell>
+                              <TableCell>{event.description || '—'}</TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
+
+              <Divider sx={{ my: 3 }} />
+
+              {/* Add New Event */}
+              <Typography variant="h6" gutterBottom>
+                Add Event
               </Typography>
-              <Box flex={1}>
-                <Typography variant="body2" color="textSecondary" gutterBottom>
-                  {typeof selectedGame?.awayTeam === 'object' ? selectedGame.awayTeam.name : 'Away Team'}
-                </Typography>
-                <TextField
-                  fullWidth
-                  label="Score"
-                  type="number"
-                  value={gameScoreData.awayTeam}
-                  onChange={(e) => setGameScoreData({ ...gameScoreData, awayTeam: parseInt(e.target.value) || 0 })}
-                  inputProps={{ min: 0 }}
-                  margin="normal"
-                />
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                <Box>
+                  <FormControl fullWidth>
+                    <InputLabel>Event Type</InputLabel>
+                    <Select
+                      value={newEventData.type}
+                      label="Event Type"
+                      onChange={(e) => setNewEventData({ ...newEventData, type: e.target.value as any })}
+                    >
+                      <MenuItem value="goal">Goal</MenuItem>
+                      <MenuItem value="own_goal">Own Goal</MenuItem>
+                      <MenuItem value="yellow_card">Yellow Card</MenuItem>
+                      <MenuItem value="red_card">Red Card</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+                <Box>
+                  <FormControl fullWidth>
+                    <InputLabel>Team</InputLabel>
+                    <Select
+                      value={newEventData.team}
+                      label="Team"
+                      onChange={(e) => {
+                        setNewEventData({ ...newEventData, team: e.target.value, player: '' });
+                      }}
+                    >
+                      {selectedGame.homeTeam && (
+                        <MenuItem value={typeof selectedGame.homeTeam === 'object' ? selectedGame.homeTeam._id : selectedGame.homeTeam}>
+                          {typeof selectedGame.homeTeam === 'object' ? selectedGame.homeTeam.name : 'Home Team'}
+                        </MenuItem>
+                      )}
+                      {selectedGame.awayTeam && (
+                        <MenuItem value={typeof selectedGame.awayTeam === 'object' ? selectedGame.awayTeam._id : selectedGame.awayTeam}>
+                          {typeof selectedGame.awayTeam === 'object' ? selectedGame.awayTeam.name : 'Away Team'}
+                        </MenuItem>
+                      )}
+                    </Select>
+                  </FormControl>
+                </Box>
+                <Box>
+                  <FormControl fullWidth>
+                    <InputLabel>Player</InputLabel>
+                    <Select
+                      value={newEventData.player}
+                      label="Player"
+                      onChange={(e) => setNewEventData({ ...newEventData, player: e.target.value })}
+                      disabled={!newEventData.team}
+                    >
+                      {newEventData.team && (
+                        (newEventData.team === (typeof selectedGame.homeTeam === 'object' ? selectedGame.homeTeam._id : selectedGame.homeTeam)
+                          ? homeTeamPlayers
+                          : awayTeamPlayers
+                        ).map((player) => (
+                          <MenuItem key={player._id} value={player._id}>
+                            {player.firstName} {player.lastName}
+                            {player.jerseyNumber ? ` (#${player.jerseyNumber})` : ''}
+                          </MenuItem>
+                        ))
+                      )}
+                    </Select>
+                  </FormControl>
+                </Box>
+                <Box>
+                  <TextField
+                    fullWidth
+                    label="Minute"
+                    type="number"
+                    value={newEventData.minute}
+                    onChange={(e) => setNewEventData({ ...newEventData, minute: parseInt(e.target.value) || 0 })}
+                    inputProps={{ min: 0, max: 120 }}
+                  />
+                </Box>
+                <Box sx={{ gridColumn: { xs: '1', sm: '1 / -1' } }}>
+                  <TextField
+                    fullWidth
+                    label="Description (optional)"
+                    value={newEventData.description}
+                    onChange={(e) => setNewEventData({ ...newEventData, description: e.target.value })}
+                    multiline
+                    rows={2}
+                  />
+                </Box>
               </Box>
             </Box>
-          </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button 
             onClick={() => {
               setShowScoreDialog(false);
               setSelectedGame(null);
-              setGameScoreData({
-                homeTeam: 0,
-                awayTeam: 0,
+              setHomeTeamPlayers([]);
+              setAwayTeamPlayers([]);
+              setNewEventData({
+                type: 'goal',
+                player: '',
+                team: '',
+                minute: 0,
+                description: '',
               });
             }}
           >
@@ -2849,31 +3027,44 @@ const LeagueDetail: React.FC = () => {
           </Button>
           <Button
             onClick={async () => {
-              if (!selectedGame) return;
+              if (!selectedGame || !newEventData.player || !newEventData.team) {
+                alert('Please fill in all required fields (Event Type, Team, Player, Minute)');
+                return;
+              }
               try {
-                await gamesApi.update(selectedGame._id, {
-                  score: {
-                    homeTeam: gameScoreData.homeTeam,
-                    awayTeam: gameScoreData.awayTeam,
-                  },
+                const updatedGame = await gamesApi.addEvent(selectedGame._id, {
+                  type: newEventData.type,
+                  player: newEventData.player,
+                  team: newEventData.team,
+                  minute: newEventData.minute,
+                  description: newEventData.description || undefined,
                 });
                 
-                await fetchGames();
-                setShowScoreDialog(false);
-                setSelectedGame(null);
-                setGameScoreData({
-                  homeTeam: 0,
-                  awayTeam: 0,
+                // Update selected game with new data
+                setSelectedGame(updatedGame);
+                
+                // Reset form
+                setNewEventData({
+                  type: 'goal',
+                  player: '',
+                  team: typeof selectedGame.homeTeam === 'object' ? selectedGame.homeTeam._id : selectedGame.homeTeam,
+                  minute: 0,
+                  description: '',
                 });
-                alert('Score updated successfully!');
-              } catch (error) {
-                console.error('Error updating score:', error);
-                alert('Error updating score. Please try again.');
+                
+                // Refresh games list
+                await fetchGames();
+                
+                alert('Event added successfully!');
+              } catch (error: any) {
+                console.error('Error adding event:', error);
+                alert(error.response?.data?.message || 'Error adding event. Please try again.');
               }
             }}
             variant="outlined"
+            disabled={!newEventData.player || !newEventData.team || newEventData.minute < 0}
           >
-            Update Score
+            Add Event
           </Button>
           <Button
             onClick={async () => {
@@ -2881,18 +3072,19 @@ const LeagueDetail: React.FC = () => {
               try {
                 await gamesApi.update(selectedGame._id, {
                   status: 'completed',
-                  score: {
-                    homeTeam: gameScoreData.homeTeam,
-                    awayTeam: gameScoreData.awayTeam,
-                  },
                 });
                 
                 await fetchGames();
                 setShowScoreDialog(false);
                 setSelectedGame(null);
-                setGameScoreData({
-                  homeTeam: 0,
-                  awayTeam: 0,
+                setHomeTeamPlayers([]);
+                setAwayTeamPlayers([]);
+                setNewEventData({
+                  type: 'goal',
+                  player: '',
+                  team: '',
+                  minute: 0,
+                  description: '',
                 });
                 alert('Game completed successfully!');
               } catch (error) {

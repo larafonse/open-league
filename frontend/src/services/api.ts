@@ -75,8 +75,8 @@ export const gamesApi = {
   update: (id: string, data: Partial<CreateGameData & { status?: string; score?: { homeTeam: number; awayTeam: number } }>): Promise<Game> => 
     api.put(`/games/${id}`, data).then(res => res.data),
   delete: (id: string): Promise<void> => api.delete(`/games/${id}`).then(() => undefined),
-  addEvent: (gameId: string, event: any): Promise<void> => 
-    api.post(`/games/${gameId}/events`, event).then(() => undefined),
+  addEvent: (gameId: string, event: { type: string; player: string; team: string; minute: number; description?: string }): Promise<Game> => 
+    api.post(`/games/${gameId}/events`, event).then(res => res.data.game),
 };
 
 // Standings API

@@ -44,6 +44,48 @@ const teamData = [
     colors: { primary: '#374151', secondary: '#F3F4F6' },
     founded: 1992,
     coach: 'David Chen'
+  },
+  {
+    name: 'Golden Eagles',
+    city: 'Denver',
+    colors: { primary: '#FCD34D', secondary: '#1F2937' },
+    founded: 1998,
+    coach: 'Robert Martinez'
+  },
+  {
+    name: 'Blue Sharks',
+    city: 'San Diego',
+    colors: { primary: '#0EA5E9', secondary: '#FFFFFF' },
+    founded: 2003,
+    coach: 'Jennifer Adams'
+  },
+  {
+    name: 'Crimson Lions',
+    city: 'Boston',
+    colors: { primary: '#B91C1C', secondary: '#FEF3C7' },
+    founded: 1985,
+    coach: 'Thomas Wright'
+  },
+  {
+    name: 'Silver Strikers',
+    city: 'Portland',
+    colors: { primary: '#6B7280', secondary: '#10B981' },
+    founded: 1999,
+    coach: 'Patricia Moore'
+  },
+  {
+    name: 'Green Vipers',
+    city: 'Austin',
+    colors: { primary: '#10B981', secondary: '#1F2937' },
+    founded: 2005,
+    coach: 'Richard Taylor'
+  },
+  {
+    name: 'Purple Panthers',
+    city: 'Nashville',
+    colors: { primary: '#7C3AED', secondary: '#FBBF24' },
+    founded: 1996,
+    coach: 'Lisa Anderson'
   }
 ];
 
@@ -98,14 +140,98 @@ const playerNames = [
   { firstName: 'Luke', lastName: 'Robinson', position: 'Defender', jerseyNumber: 3 },
   { firstName: 'Jack', lastName: 'Clark', position: 'Midfielder', jerseyNumber: 6 },
   { firstName: 'Connor', lastName: 'Rodriguez', position: 'Forward', jerseyNumber: 7 },
-  { firstName: 'Hunter', lastName: 'Lewis', position: 'Defender', jerseyNumber: 2 }
+  { firstName: 'Hunter', lastName: 'Lewis', position: 'Defender', jerseyNumber: 2 },
+  
+  // Golden Eagles players
+  { firstName: 'Robert', lastName: 'Martinez', position: 'Goalkeeper', jerseyNumber: 1 },
+  { firstName: 'Patrick', lastName: 'O\'Brien', position: 'Defender', jerseyNumber: 4 },
+  { firstName: 'Sean', lastName: 'Murphy', position: 'Defender', jerseyNumber: 5 },
+  { firstName: 'Kevin', lastName: 'O\'Connor', position: 'Midfielder', jerseyNumber: 8 },
+  { firstName: 'Brian', lastName: 'Kelly', position: 'Midfielder', jerseyNumber: 10 },
+  { firstName: 'Daniel', lastName: 'Walsh', position: 'Forward', jerseyNumber: 9 },
+  { firstName: 'Michael', lastName: 'Sullivan', position: 'Forward', jerseyNumber: 11 },
+  { firstName: 'Timothy', lastName: 'Quinn', position: 'Defender', jerseyNumber: 3 },
+  { firstName: 'Christopher', lastName: 'Doyle', position: 'Midfielder', jerseyNumber: 6 },
+  { firstName: 'Matthew', lastName: 'Byrne', position: 'Forward', jerseyNumber: 7 },
+  { firstName: 'Joseph', lastName: 'Reilly', position: 'Defender', jerseyNumber: 2 },
+  
+  // Blue Sharks players
+  { firstName: 'Jordan', lastName: 'Mitchell', position: 'Goalkeeper', jerseyNumber: 1 },
+  { firstName: 'Casey', lastName: 'Parker', position: 'Defender', jerseyNumber: 4 },
+  { firstName: 'Morgan', lastName: 'Riley', position: 'Defender', jerseyNumber: 5 },
+  { firstName: 'Avery', lastName: 'Sullivan', position: 'Midfielder', jerseyNumber: 8 },
+  { firstName: 'Quinn', lastName: 'Bennett', position: 'Midfielder', jerseyNumber: 10 },
+  { firstName: 'Riley', lastName: 'Foster', position: 'Forward', jerseyNumber: 9 },
+  { firstName: 'Sage', lastName: 'Hayes', position: 'Forward', jerseyNumber: 11 },
+  { firstName: 'Dakota', lastName: 'Bryant', position: 'Defender', jerseyNumber: 3 },
+  { firstName: 'Skyler', lastName: 'Griffin', position: 'Midfielder', jerseyNumber: 6 },
+  { firstName: 'Cameron', lastName: 'Dunn', position: 'Forward', jerseyNumber: 7 },
+  { firstName: 'Blake', lastName: 'Perry', position: 'Defender', jerseyNumber: 2 },
+  
+  // Crimson Lions players
+  { firstName: 'Oliver', lastName: 'Stewart', position: 'Goalkeeper', jerseyNumber: 1 },
+  { firstName: 'George', lastName: 'Campbell', position: 'Defender', jerseyNumber: 4 },
+  { firstName: 'Arthur', lastName: 'Mitchell', position: 'Defender', jerseyNumber: 5 },
+  { firstName: 'Edward', lastName: 'Roberts', position: 'Midfielder', jerseyNumber: 8 },
+  { firstName: 'Charles', lastName: 'Turner', position: 'Midfielder', jerseyNumber: 10 },
+  { firstName: 'Harold', lastName: 'Phillips', position: 'Forward', jerseyNumber: 9 },
+  { firstName: 'Walter', lastName: 'Campbell', position: 'Forward', jerseyNumber: 11 },
+  { firstName: 'Frank', lastName: 'Parker', position: 'Defender', jerseyNumber: 3 },
+  { firstName: 'Albert', lastName: 'Evans', position: 'Midfielder', jerseyNumber: 6 },
+  { firstName: 'Raymond', lastName: 'Edwards', position: 'Forward', jerseyNumber: 7 },
+  { firstName: 'Louis', lastName: 'Collins', position: 'Defender', jerseyNumber: 2 },
+  
+  // Silver Strikers players
+  { firstName: 'Zachary', lastName: 'Bennett', position: 'Goalkeeper', jerseyNumber: 1 },
+  { firstName: 'Evan', lastName: 'Wood', position: 'Defender', jerseyNumber: 4 },
+  { firstName: 'Gavin', lastName: 'Ross', position: 'Defender', jerseyNumber: 5 },
+  { firstName: 'Brayden', lastName: 'Henderson', position: 'Midfielder', jerseyNumber: 8 },
+  { firstName: 'Colton', lastName: 'Coleman', position: 'Midfielder', jerseyNumber: 10 },
+  { firstName: 'Parker', lastName: 'Jenkins', position: 'Forward', jerseyNumber: 9 },
+  { firstName: 'Tristan', lastName: 'Powell', position: 'Forward', jerseyNumber: 11 },
+  { firstName: 'Bryce', lastName: 'Long', position: 'Defender', jerseyNumber: 3 },
+  { firstName: 'Carson', lastName: 'Patterson', position: 'Midfielder', jerseyNumber: 6 },
+  { firstName: 'Cooper', lastName: 'Hughes', position: 'Forward', jerseyNumber: 7 },
+  { firstName: 'Easton', lastName: 'Flores', position: 'Defender', jerseyNumber: 2 },
+  
+  // Green Vipers players
+  { firstName: 'Aiden', lastName: 'Rivera', position: 'Goalkeeper', jerseyNumber: 1 },
+  { firstName: 'Caden', lastName: 'Reed', position: 'Defender', jerseyNumber: 4 },
+  { firstName: 'Jaden', lastName: 'Bailey', position: 'Defender', jerseyNumber: 5 },
+  { firstName: 'Kaden', lastName: 'Cooper', position: 'Midfielder', jerseyNumber: 8 },
+  { firstName: 'Landon', lastName: 'Richardson', position: 'Midfielder', jerseyNumber: 10 },
+  { firstName: 'Logan', lastName: 'Cox', position: 'Forward', jerseyNumber: 9 },
+  { firstName: 'Mason', lastName: 'Howard', position: 'Forward', jerseyNumber: 11 },
+  { firstName: 'Nolan', lastName: 'Ward', position: 'Defender', jerseyNumber: 3 },
+  { firstName: 'Owen', lastName: 'Torres', position: 'Midfielder', jerseyNumber: 6 },
+  { firstName: 'Preston', lastName: 'Peterson', position: 'Forward', jerseyNumber: 7 },
+  { firstName: 'Quinn', lastName: 'Gray', position: 'Defender', jerseyNumber: 2 },
+  
+  // Purple Panthers players
+  { firstName: 'Riley', lastName: 'Ramirez', position: 'Goalkeeper', jerseyNumber: 1 },
+  { firstName: 'Sawyer', lastName: 'James', position: 'Defender', jerseyNumber: 4 },
+  { firstName: 'Tyler', lastName: 'Watson', position: 'Defender', jerseyNumber: 5 },
+  { firstName: 'Wyatt', lastName: 'Brooks', position: 'Midfielder', jerseyNumber: 8 },
+  { firstName: 'Xavier', lastName: 'Kelly', position: 'Midfielder', jerseyNumber: 10 },
+  { firstName: 'Zane', lastName: 'Sanders', position: 'Forward', jerseyNumber: 9 },
+  { firstName: 'Zion', lastName: 'Price', position: 'Forward', jerseyNumber: 11 },
+  { firstName: 'Asher', lastName: 'Bennett', position: 'Defender', jerseyNumber: 3 },
+  { firstName: 'Bentley', lastName: 'Wood', position: 'Midfielder', jerseyNumber: 6 },
+  { firstName: 'Carter', lastName: 'Barnes', position: 'Forward', jerseyNumber: 7 },
+  { firstName: 'Dylan', lastName: 'Ross', position: 'Defender', jerseyNumber: 2 }
 ];
 
 const venues = [
   { name: 'Thunder Stadium', address: '123 Thunder Way, Seattle, WA', capacity: 25000 },
   { name: 'Fire Arena', address: '456 Phoenix Blvd, Phoenix, AZ', capacity: 30000 },
   { name: 'Storm Center', address: '789 Miami Drive, Miami, FL', capacity: 22000 },
-  { name: 'Iron Field', address: '321 Chicago Ave, Chicago, IL', capacity: 28000 }
+  { name: 'Iron Field', address: '321 Chicago Ave, Chicago, IL', capacity: 28000 },
+  { name: 'Eagle Park', address: '555 Mountain View, Denver, CO', capacity: 24000 },
+  { name: 'Shark Bay', address: '777 Ocean Drive, San Diego, CA', capacity: 26000 },
+  { name: 'Lion\'s Den', address: '888 Beacon St, Boston, MA', capacity: 27000 },
+  { name: 'Striker Grounds', address: '999 Rose Quarter, Portland, OR', capacity: 23000 },
+  { name: 'Viper Venue', address: '111 Music Lane, Austin, TX', capacity: 25000 },
+  { name: 'Panther Stadium', address: '222 Broadway, Nashville, TN', capacity: 29000 }
 ];
 
 // Helper function to generate random date

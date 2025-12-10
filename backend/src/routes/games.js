@@ -115,7 +115,8 @@ router.get('/:id', async (req, res) => {
     const game = await Game.findById(req.params.id)
       .populate('homeTeam', 'name city colors')
       .populate('awayTeam', 'name city colors')
-      .populate('events.player', 'firstName lastName');
+      .populate('events.player', 'firstName lastName jerseyNumber')
+      .populate('events.team', 'name city');
     
     if (!game) {
       return res.status(404).json({ message: 'Game not found' });
@@ -243,7 +244,10 @@ router.post('/:id/events', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const game = await Game.findById(req.params.id);
+    const game = await Game.findById(req.params.id)
+      .populate('homeTeam', 'name city')
+      .populate('awayTeam', 'name city');
+    
     if (!game) {
       return res.status(404).json({ message: 'Game not found' });
     }
@@ -252,10 +256,69 @@ router.post('/:id/events', [
       return res.status(400).json({ message: 'Can only add events to games in progress or completed' });
     }
 
-    game.events.push(req.body);
+    const eventType = req.body.type;
+    const playerId = req.body.player;
+    const teamId = req.body.team.toString();
+    const isHomeTeam = game.homeTeam._id.toString() === teamId;
+
+    // Check for yellow card auto-conversion to red card
+    if (eventType === 'yellow_card') {
+      // Count existing yellow cards for this player in this game
+      const yellowCardCount = game.events.filter(e => 
+        e.type === 'yellow_card' && 
+        e.player.toString() === playerId.toString()
+      ).length;
+
+      // If player already has 1 yellow card, convert to red card instead
+      if (yellowCardCount >= 1) {
+        // Add red card event instead
+        game.events.push({
+          ...req.body,
+          type: 'red_card',
+          description: req.body.description || 'Second yellow card (automatic red card)'
+        });
+      } else {
+        // Add yellow card normally
+        game.events.push(req.body);
+      }
+    } else {
+      // Add other events normally
+      game.events.push(req.body);
+    }
+
+    // Update score for goal events
+    if (eventType === 'goal' || eventType === 'own_goal') {
+      if (eventType === 'goal') {
+        // Regular goal: increment the scoring team's score
+        if (isHomeTeam) {
+          game.score.homeTeam = (game.score.homeTeam || 0) + 1;
+        } else {
+          game.score.awayTeam = (game.score.awayTeam || 0) + 1;
+        }
+      } else {
+        // Own goal: increment the opposing team's score
+        if (isHomeTeam) {
+          game.score.awayTeam = (game.score.awayTeam || 0) + 1;
+        } else {
+          game.score.homeTeam = (game.score.homeTeam || 0) + 1;
+        }
+      }
+    }
+
     await game.save();
 
-    res.json({ message: 'Event added successfully', event: req.body });
+    // Return updated game with populated events
+    const updatedGame = await Game.findById(game._id)
+      .populate('homeTeam', 'name city colors')
+      .populate('awayTeam', 'name city colors')
+      .populate('season', 'name status')
+      .populate('events.player', 'firstName lastName jerseyNumber')
+      .populate('events.team', 'name city');
+
+    res.json({ 
+      message: 'Event added successfully', 
+      game: updatedGame 
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error adding event', error: error.message });
   }
