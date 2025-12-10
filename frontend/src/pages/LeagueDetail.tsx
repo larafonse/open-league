@@ -42,6 +42,7 @@ import {
   CalendarToday,
   PersonAdd,
   HowToReg,
+  PlayArrow,
 } from '@mui/icons-material';
 import { leaguesApi, seasonsApi, teamsApi, playersApi, gamesApi, venuesApi } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
@@ -64,6 +65,14 @@ const LeagueDetail: React.FC = () => {
   const [showCreateVenueDialog, setShowCreateVenueDialog] = useState(false);
   const [showCreateSeasonDialog, setShowCreateSeasonDialog] = useState(false);
   const [selectedVenueForAdd, setSelectedVenueForAdd] = useState<any | null>(null);
+  const [showSetVenueDialog, setShowSetVenueDialog] = useState(false);
+  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+  const [gameVenueData, setGameVenueData] = useState({
+    venueName: '',
+    venueAddress: '',
+    scheduledDate: '',
+    scheduledTime: '',
+  });
   const [newSeasonData, setNewSeasonData] = useState({
     name: '',
     description: '',
@@ -419,6 +428,37 @@ const LeagueDetail: React.FC = () => {
     }
   };
 
+  const handleStartSeason = async () => {
+    if (!selectedSeason) return;
+    try {
+      // Check if schedule needs to be generated first
+      if (!selectedSeason.weeks || selectedSeason.weeks.length === 0) {
+        const confirmGenerate = window.confirm(
+          'No schedule has been generated yet. Would you like to generate the schedule and start the season?'
+        );
+        if (confirmGenerate) {
+          await seasonsApi.generateSchedule(selectedSeason._id);
+          await fetchSeasons();
+          // Refresh selected season
+          const updatedSeason = await seasonsApi.getById(selectedSeason._id);
+          setSelectedSeason(updatedSeason);
+        } else {
+          return;
+        }
+      }
+      
+      await seasonsApi.start(selectedSeason._id);
+      await fetchSeasons();
+      // Refresh selected season
+      const updatedSeason = await seasonsApi.getById(selectedSeason._id);
+      setSelectedSeason(updatedSeason);
+      alert('Season started successfully! Registration is now closed.');
+    } catch (error: any) {
+      console.error('Error starting season:', error);
+      alert(error.response?.data?.message || 'Error starting season. Please try again.');
+    }
+  };
+
   const handleOpenRegisterDialog = async (season: Season) => {
     setSelectedSeason(season);
     setRegisterMode('team');
@@ -651,6 +691,16 @@ const LeagueDetail: React.FC = () => {
               New Season
             </Button>
           )}
+          {selectedSeason && selectedSeason.status === 'registration' && league.isOwner && (
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<PlayArrow />}
+              onClick={handleStartSeason}
+            >
+              Start League
+            </Button>
+          )}
           {selectedSeason && selectedSeason.status === 'registration' && (league.isMember || league.isOwner) && (
             <Button
               variant="contained"
@@ -659,9 +709,9 @@ const LeagueDetail: React.FC = () => {
               onClick={() => setShowRegisterDialog(true)}
             >
               Register
-                  </Button>
-                )}
-              </Box>
+            </Button>
+          )}
+        </Box>
       </Box>
 
           <Card sx={{ mb: 3 }}>
@@ -1106,8 +1156,14 @@ const LeagueDetail: React.FC = () => {
                                       onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
-                                        // Navigate to game detail page or open edit dialog
-                                        window.location.href = `/games/${game._id}`;
+                                        setSelectedGame(game);
+                                        setGameVenueData({
+                                          venueName: game.venue?.name || '',
+                                          venueAddress: game.venue?.address || '',
+                                          scheduledDate: game.scheduledDate ? new Date(game.scheduledDate).toISOString().split('T')[0] : '',
+                                          scheduledTime: game.scheduledDate ? new Date(game.scheduledDate).toTimeString().slice(0, 5) : '',
+                                        });
+                                        setShowSetVenueDialog(true);
                                       }}
                                     >
                                       Set Venue & Time
@@ -1427,6 +1483,46 @@ const LeagueDetail: React.FC = () => {
                   <Typography variant="h6" gutterBottom>
                     Season Settings: {selectedSeason.name}
                   </Typography>
+              {/* Reopen Registration */}
+              {(selectedSeason.status === 'active' || selectedSeason.status === 'completed') && (
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Box>
+                        <Typography variant="h6" gutterBottom>
+                          Reopen Registration
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary">
+                          Reopen registration to allow teams to join or leave this season. The season status will change back to registration.
+                        </Typography>
+                      </Box>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<HowToReg />}
+                        onClick={async () => {
+                          if (window.confirm(`Are you sure you want to reopen registration for "${selectedSeason.name}"? This will change the season status back to registration.`)) {
+                            try {
+                              await seasonsApi.update(selectedSeason._id, { status: 'registration' });
+                              await fetchSeasons();
+                              // Refresh selected season
+                              const updatedSeason = await seasonsApi.getById(selectedSeason._id);
+                              setSelectedSeason(updatedSeason);
+                              alert('Registration reopened successfully!');
+                            } catch (error) {
+                              console.error('Error reopening registration:', error);
+                              alert('Error reopening registration. Please try again.');
+                            }
+                          }
+                        }}
+                      >
+                        Reopen Registration
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Complete Season */}
               {selectedSeason.status === 'active' && (
                 <Card variant="outlined">
@@ -2259,6 +2355,168 @@ const LeagueDetail: React.FC = () => {
               Create Profile & Join Team
             </Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Set Venue & Time Dialog */}
+      <Dialog 
+        open={showSetVenueDialog} 
+        onClose={() => {
+          setShowSetVenueDialog(false);
+          setSelectedGame(null);
+          setGameVenueData({
+            venueName: '',
+            venueAddress: '',
+            scheduledDate: '',
+            scheduledTime: '',
+          });
+        }} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          Set Venue & Time {selectedGame && `- ${selectedGame.homeTeam.name} vs ${selectedGame.awayTeam.name}`}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Autocomplete
+              options={venues}
+              getOptionLabel={(option) => option.name}
+              value={venues.find(v => v.name === gameVenueData.venueName) || null}
+              onChange={(_, newValue) => {
+                if (newValue) {
+                  setGameVenueData({
+                    ...gameVenueData,
+                    venueName: newValue.name,
+                    venueAddress: newValue.address?.street ? 
+                      `${newValue.address.street}, ${newValue.address.city}, ${newValue.address.state} ${newValue.address.zipCode}` : 
+                      '',
+                  });
+                } else {
+                  setGameVenueData({
+                    ...gameVenueData,
+                    venueName: '',
+                    venueAddress: '',
+                  });
+                }
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Select Venue"
+                  margin="normal"
+                  fullWidth
+                />
+              )}
+              renderOption={(props, option) => (
+                <Box component="li" {...props} key={option._id}>
+                  <Box>
+                    <Typography variant="body1">{option.name}</Typography>
+                    {option.address && (
+                      <Typography variant="body2" color="textSecondary">
+                        {option.address.street}, {option.address.city}, {option.address.state}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              )}
+            />
+            <TextField
+              fullWidth
+              label="Venue Name (if not in list)"
+              value={gameVenueData.venueName}
+              onChange={(e) => setGameVenueData({ ...gameVenueData, venueName: e.target.value })}
+              margin="normal"
+              placeholder="Enter venue name manually"
+            />
+            <TextField
+              fullWidth
+              label="Venue Address (optional)"
+              value={gameVenueData.venueAddress}
+              onChange={(e) => setGameVenueData({ ...gameVenueData, venueAddress: e.target.value })}
+              margin="normal"
+              placeholder="Enter venue address"
+            />
+            <TextField
+              fullWidth
+              label="Date"
+              type="date"
+              value={gameVenueData.scheduledDate}
+              onChange={(e) => setGameVenueData({ ...gameVenueData, scheduledDate: e.target.value })}
+              margin="normal"
+              required
+              InputLabelProps={{
+                shrink: true,
+              }}
+            />
+            <TextField
+              fullWidth
+              label="Time"
+              type="time"
+              value={gameVenueData.scheduledTime}
+              onChange={(e) => setGameVenueData({ ...gameVenueData, scheduledTime: e.target.value })}
+              margin="normal"
+              required
+              InputLabelProps={{
+                shrink: true,
+              }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setShowSetVenueDialog(false);
+              setSelectedGame(null);
+              setGameVenueData({
+                venueName: '',
+                venueAddress: '',
+                scheduledDate: '',
+                scheduledTime: '',
+              });
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              if (!selectedGame || !gameVenueData.venueName || !gameVenueData.scheduledDate || !gameVenueData.scheduledTime) {
+                alert('Please fill in all required fields (Venue Name, Date, and Time).');
+                return;
+              }
+              try {
+                // Combine date and time
+                const scheduledDateTime = new Date(`${gameVenueData.scheduledDate}T${gameVenueData.scheduledTime}`);
+                
+                await gamesApi.update(selectedGame._id, {
+                  venue: {
+                    name: gameVenueData.venueName,
+                    address: gameVenueData.venueAddress || undefined,
+                  },
+                  scheduledDate: scheduledDateTime.toISOString(),
+                });
+                
+                // Refresh games
+                await fetchGames();
+                setShowSetVenueDialog(false);
+                setSelectedGame(null);
+                setGameVenueData({
+                  venueName: '',
+                  venueAddress: '',
+                  scheduledDate: '',
+                  scheduledTime: '',
+                });
+                alert('Venue and time set successfully!');
+              } catch (error) {
+                console.error('Error setting venue and time:', error);
+                alert('Error setting venue and time. Please try again.');
+              }
+            }}
+            variant="contained"
+            disabled={!gameVenueData.venueName || !gameVenueData.scheduledDate || !gameVenueData.scheduledTime}
+          >
+            Set Venue & Time
+          </Button>
         </DialogActions>
       </Dialog>
     </Container>

@@ -423,7 +423,7 @@ router.put('/:id', authenticate, [
   body('name').optional().notEmpty().withMessage('Season name cannot be empty'),
   body('startDate').optional().isISO8601().withMessage('Valid start date is required'),
   body('endDate').optional().isISO8601().withMessage('Valid end date is required'),
-  body('status').optional().isIn(['draft', 'active', 'completed', 'cancelled'])
+  body('status').optional().isIn(['draft', 'registration', 'active', 'completed', 'cancelled'])
     .withMessage('Valid status is required')
 ], async (req, res) => {
   try {
