@@ -47,6 +47,7 @@ import {
   PersonAdd,
   HowToReg,
   PlayArrow,
+  SportsSoccer,
 } from '@mui/icons-material';
 import { leaguesApi, seasonsApi, teamsApi, playersApi, gamesApi, venuesApi } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
@@ -145,6 +146,8 @@ const LeagueDetail: React.FC = () => {
     dateOfBirth: '',
     position: 'Midfielder',
   });
+  const [statistics, setStatistics] = useState<{ topScorers: any[]; standings: any[] } | null>(null);
+  const [loadingStatistics, setLoadingStatistics] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -169,8 +172,27 @@ const LeagueDetail: React.FC = () => {
       fetchTeams();
       fetchGames();
       fetchVenues();
+      fetchStatistics();
+    } else {
+      setStatistics(null);
     }
   }, [selectedSeason, id]);
+
+  // Fetch statistics for the selected season
+  const fetchStatistics = async () => {
+    if (!selectedSeason) return;
+    
+    setLoadingStatistics(true);
+    try {
+      const data = await seasonsApi.getStatistics(selectedSeason._id);
+      setStatistics(data);
+    } catch (error) {
+      console.error('Error fetching statistics:', error);
+      setStatistics(null);
+    } finally {
+      setLoadingStatistics(false);
+    }
+  };
 
   // Fetch all venues on mount
   useEffect(() => {
@@ -381,6 +403,10 @@ const LeagueDetail: React.FC = () => {
             return gameSeasonId === seasonId;
           });
           setGames(seasonGames);
+          // Refresh statistics when games are updated
+          if (tabValue === 3) {
+            fetchStatistics();
+          }
         } else if (seasons.length > 0) {
           // Fallback: show games from all seasons in the league
           const seasonIds = seasons.map(s => s._id.toString());
@@ -1265,230 +1291,248 @@ const LeagueDetail: React.FC = () => {
       {tabValue === 3 && seasons.length > 0 && (
         <Card>
           <CardContent>
-            <Box mb={3}>
-              <Typography variant="h6" gutterBottom>
-                Standings
-              </Typography>
-              {selectedSeason && (
-                <Typography variant="body2" color="textSecondary">
-                  Season: {selectedSeason.name}
-                </Typography>
-              )}
-            </Box>
-            {selectedSeason ? (() => {
-              // Calculate standings from games
-              type StandingData = {
-                team: any;
-                MP: number;
-                W: number;
-                D: number;
-                L: number;
-                GF: number;
-                GA: number;
-                GD: number;
-                Pts: number;
-                last5: Array<'W' | 'D' | 'L'>;
-              };
-              const standingsMap = new Map<string, StandingData>();
-
-              // Initialize standings for all teams in the season
-              if (selectedSeason.teams && Array.isArray(selectedSeason.teams)) {
-                selectedSeason.teams.forEach((team: any) => {
-                  const teamId = typeof team === 'object' && team._id ? team._id.toString() : String(team);
-                  standingsMap.set(teamId, {
-                    team: typeof team === 'object' ? team : null,
-                    MP: 0,
-                    W: 0,
-                    D: 0,
-                    L: 0,
-                    GF: 0,
-                    GA: 0,
-                    GD: 0,
-                    Pts: 0,
-                    last5: [],
-                  });
-                });
-              }
-
-              // Process completed games
-              const completedGames = games
-                .filter(game => game.status === 'completed' && game.score)
-                .sort((a, b) => {
-                  const dateA = new Date(a.actualDate || a.scheduledDate).getTime();
-                  const dateB = new Date(b.actualDate || b.scheduledDate).getTime();
-                  return dateB - dateA; // Most recent first
-                });
-
-              completedGames.forEach((game) => {
-                const homeTeamId = typeof game.homeTeam === 'object' && game.homeTeam._id ? game.homeTeam._id.toString() : String(game.homeTeam);
-                const awayTeamId = typeof game.awayTeam === 'object' && game.awayTeam._id ? game.awayTeam._id.toString() : String(game.awayTeam);
-                
-                const homeStanding = standingsMap.get(homeTeamId);
-                const awayStanding = standingsMap.get(awayTeamId);
-
-                if (homeStanding && awayStanding && game.score) {
-                  const homeScore = game.score.homeTeam;
-                  const awayScore = game.score.awayTeam;
-
-                  // Update home team
-                  homeStanding.MP++;
-                  homeStanding.GF += homeScore;
-                  homeStanding.GA += awayScore;
-                  homeStanding.GD = homeStanding.GF - homeStanding.GA;
-
-                  // Update away team
-                  awayStanding.MP++;
-                  awayStanding.GF += awayScore;
-                  awayStanding.GA += homeScore;
-                  awayStanding.GD = awayStanding.GF - awayStanding.GA;
-
-                  // Determine result
-                  if (homeScore > awayScore) {
-                    homeStanding.W++;
-                    homeStanding.Pts += 3;
-                    awayStanding.L++;
-                    homeStanding.last5.unshift('W');
-                    awayStanding.last5.unshift('L');
-                  } else if (awayScore > homeScore) {
-                    awayStanding.W++;
-                    awayStanding.Pts += 3;
-                    homeStanding.L++;
-                    homeStanding.last5.unshift('L');
-                    awayStanding.last5.unshift('W');
-                  } else {
-                    homeStanding.D++;
-                    homeStanding.Pts += 1;
-                    awayStanding.D++;
-                    awayStanding.Pts += 1;
-                    homeStanding.last5.unshift('D');
-                    awayStanding.last5.unshift('D');
-                  }
-
-                  // Keep only last 5 matches
-                  if (homeStanding.last5.length > 5) homeStanding.last5 = homeStanding.last5.slice(0, 5);
-                  if (awayStanding.last5.length > 5) awayStanding.last5 = awayStanding.last5.slice(0, 5);
-                }
-              });
-
-              // Convert to array and sort
-              const standings = Array.from(standingsMap.values())
-                .filter(s => s.team !== null && s.team !== undefined)
-                .sort((a, b) => {
-                  // Sort by Points (desc), then GD (desc), then GF (desc)
-                  if (b.Pts !== a.Pts) return b.Pts - a.Pts;
-                  if (b.GD !== a.GD) return b.GD - a.GD;
-                  return b.GF - a.GF;
-                });
-
-              return standings.length > 0 ? (
-                <TableContainer component={Paper}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Rank</TableCell>
-                        <TableCell>Club</TableCell>
-                        <TableCell align="center">MP</TableCell>
-                        <TableCell align="center">W</TableCell>
-                        <TableCell align="center">D</TableCell>
-                        <TableCell align="center">L</TableCell>
-                        <TableCell align="center">GF</TableCell>
-                        <TableCell align="center">GA</TableCell>
-                        <TableCell align="center">GD</TableCell>
-                        <TableCell align="center">Pts</TableCell>
-                        <TableCell align="center">Last 5</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {standings.map((standing, index) => {
-                        const team = standing.team;
-                        if (!team) return null;
-                        const teamId = typeof team === 'object' && team._id ? team._id : String(team);
-                        return (
-                          <TableRow key={teamId} hover>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight="bold">
-                              {index + 1}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight="medium">
-                              {typeof team === 'object' ? team.name : '—'}
-                            </Typography>
-                            {typeof team === 'object' && team.city && (
-                              <Typography variant="caption" color="textSecondary">
-                                {team.city}
-                              </Typography>
-                            )}
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2">{standing.MP}</Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2">{standing.W}</Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2">{standing.D}</Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2">{standing.L}</Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2">{standing.GF}</Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2">{standing.GA}</Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2" color={standing.GD > 0 ? 'success.main' : standing.GD < 0 ? 'error.main' : 'text.secondary'}>
-                              {standing.GD > 0 ? '+' : ''}{standing.GD}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2" fontWeight="bold">
-                              {standing.Pts}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Box display="flex" gap={0.5} justifyContent="center">
-                              {standing.last5.length > 0 ? (
-                                standing.last5.map((result, idx) => (
-                                  <Chip
-                                    key={idx}
-                                    label={result}
-                                    size="small"
-                                    sx={{
-                                      minWidth: 32,
-                                      height: 24,
-                                      fontSize: '0.7rem',
-                                      bgcolor: result === 'W' ? 'success.main' : result === 'D' ? 'warning.main' : 'error.main',
-                                      color: 'white',
-                                    }}
-                                  />
-                                ))
-                              ) : (
-                                <Typography variant="caption" color="textSecondary">
-                                  —
+            {selectedSeason ? (
+              loadingStatistics ? (
+                <Box display="flex" justifyContent="center" py={4}>
+                  <CircularProgress />
+                </Box>
+              ) : statistics ? (
+                <>
+                  {/* Top Scorer Card */}
+                  {statistics.topScorers.length > 0 && statistics.topScorers[0] && (
+                    <Box mb={4}>
+                      <Card sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+                        <CardContent>
+                          <Box display="flex" alignItems="center" justifyContent="space-between">
+                            <Box display="flex" alignItems="center" gap={2}>
+                              <Avatar sx={{ bgcolor: 'rgba(255, 255, 255, 0.2)', width: 64, height: 64 }}>
+                                <SportsSoccer sx={{ fontSize: 32, color: 'white' }} />
+                              </Avatar>
+                              <Box>
+                                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                  Top Scorer
                                 </Typography>
-                              )}
+                                <Typography variant="h5" sx={{ color: 'white', fontWeight: 'bold' }}>
+                                  {statistics.topScorers[0].player
+                                    ? `${statistics.topScorers[0].player.firstName} ${statistics.topScorers[0].player.lastName}`
+                                    : '—'}
+                                </Typography>
+                                {statistics.topScorers[0].team && (
+                                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                    {statistics.topScorers[0].team.name}
+                                  </Typography>
+                                )}
+                              </Box>
                             </Box>
-                          </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                            <Box textAlign="right">
+                              <Typography variant="h2" sx={{ color: 'white', fontWeight: 'bold' }}>
+                                {statistics.topScorers[0].goals}
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                {statistics.topScorers[0].goals === 1 ? 'Goal' : 'Goals'}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Box>
+                  )}
+
+                  {/* Top Scorers and Standings Side by Side */}
+                  <Box display="flex" flexDirection={{ xs: 'column', md: 'row' }} gap={3}>
+                    {/* Top Scorers Section */}
+                    <Box flex={1}>
+                      <Typography variant="h6" gutterBottom>
+                        Top Scorers
+                      </Typography>
+                      {statistics.topScorers.length > 0 ? (
+                        <TableContainer component={Paper} variant="outlined">
+                          <Table>
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Rank</TableCell>
+                                <TableCell>Player</TableCell>
+                                <TableCell>Team</TableCell>
+                                <TableCell align="center">Goals</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {statistics.topScorers.map((scorer, index) => {
+                                if (!scorer.player) return null;
+                                return (
+                                  <TableRow key={scorer.player._id || index} hover>
+                                    <TableCell>
+                                      <Typography variant="body2" fontWeight="bold">
+                                        {index + 1}
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Box display="flex" alignItems="center" gap={1}>
+                                        <Typography variant="body2" fontWeight="medium">
+                                          {scorer.player.firstName} {scorer.player.lastName}
+                                        </Typography>
+                                        {scorer.player.jerseyNumber && (
+                                          <Chip 
+                                            label={`#${scorer.player.jerseyNumber}`} 
+                                            size="small" 
+                                            variant="outlined"
+                                          />
+                                        )}
+                                      </Box>
+                                    </TableCell>
+                                    <TableCell>
+                                      {scorer.team ? (
+                                        <Typography variant="body2">
+                                          {scorer.team.name}
+                                        </Typography>
+                                      ) : (
+                                        <Typography variant="body2" color="textSecondary">
+                                          —
+                                        </Typography>
+                                      )}
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <Typography variant="body2" fontWeight="bold" color="primary">
+                                        {scorer.goals}
+                                      </Typography>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      ) : (
+                        <Box p={3} textAlign="center">
+                          <Typography variant="body2" color="textSecondary">
+                            No goal data available yet. Goals will appear here once games are completed with events recorded.
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+
+                    {/* Standings Section */}
+                    <Box flex={1}>
+                      <Typography variant="h6" gutterBottom>
+                        Standings
+                      </Typography>
+                      {statistics.standings.length > 0 ? (
+                        <TableContainer component={Paper} variant="outlined">
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Rank</TableCell>
+                                <TableCell>Club</TableCell>
+                                <TableCell align="center">MP</TableCell>
+                                <TableCell align="center">W</TableCell>
+                                <TableCell align="center">D</TableCell>
+                                <TableCell align="center">L</TableCell>
+                                <TableCell align="center">GF</TableCell>
+                                <TableCell align="center">GA</TableCell>
+                                <TableCell align="center">GD</TableCell>
+                                <TableCell align="center">Pts</TableCell>
+                                <TableCell align="center">Last 5</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {statistics.standings.map((standing, index) => {
+                                if (!standing.team) return null;
+                                return (
+                                  <TableRow key={standing.team._id || index} hover>
+                                    <TableCell>
+                                      <Typography variant="body2" fontWeight="bold">
+                                        {index + 1}
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Typography variant="body2" fontWeight="medium">
+                                        {standing.team.name}
+                                      </Typography>
+                                      {standing.team.city && (
+                                        <Typography variant="caption" color="textSecondary">
+                                          {standing.team.city}
+                                        </Typography>
+                                      )}
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <Typography variant="body2">{standing.MP}</Typography>
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <Typography variant="body2">{standing.W}</Typography>
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <Typography variant="body2">{standing.D}</Typography>
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <Typography variant="body2">{standing.L}</Typography>
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <Typography variant="body2">{standing.GF}</Typography>
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <Typography variant="body2">{standing.GA}</Typography>
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <Typography variant="body2" color={standing.GD > 0 ? 'success.main' : standing.GD < 0 ? 'error.main' : 'text.secondary'}>
+                                        {standing.GD > 0 ? '+' : ''}{standing.GD}
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <Typography variant="body2" fontWeight="bold">
+                                        {standing.Pts}
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <Box display="flex" gap={0.5} justifyContent="center">
+                                        {standing.last5 && standing.last5.length > 0 ? (
+                                          standing.last5.map((result: 'W' | 'D' | 'L', idx: number) => (
+                                            <Chip
+                                              key={idx}
+                                              label={result}
+                                              size="small"
+                                              sx={{
+                                                minWidth: 32,
+                                                height: 24,
+                                                fontSize: '0.7rem',
+                                                bgcolor: result === 'W' ? 'success.main' : result === 'D' ? 'warning.main' : 'error.main',
+                                                color: 'white',
+                                              }}
+                                            />
+                                          ))
+                                        ) : (
+                                          <Typography variant="caption" color="textSecondary">
+                                            —
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      ) : (
+                        <Box textAlign="center" py={4}>
+                          <Typography variant="body2" color="textSecondary">
+                            No teams registered for this season.
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  </Box>
+                </>
               ) : (
                 <Box textAlign="center" py={4}>
                   <Typography variant="body2" color="textSecondary">
-                    No teams registered for this season.
+                    No statistics available for this season.
                   </Typography>
                 </Box>
-              );
-            })() : (
+              )
+            ) : (
               <Box textAlign="center" py={4}>
                 <Typography variant="body2" color="textSecondary">
-                  Please select a season to view standings.
+                  Please select a season to view statistics.
                 </Typography>
               </Box>
             )}

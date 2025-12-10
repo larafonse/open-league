@@ -3,6 +3,7 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const Game = require('../models/Game');
 const Team = require('../models/Team');
+const Player = require('../models/Player');
 
 // Debug endpoint to check all games
 router.get('/debug', async (req, res) => {
@@ -87,11 +88,40 @@ router.get('/', async (req, res) => {
         console.log(`Warning: Game ${game._id} has no season field`);
       }
       
+      // Populate events.player and events.team
+      const populatedEvents = await Promise.all((game.events || []).map(async (event) => {
+        let player = null;
+        let team = null;
+        
+        if (event.player) {
+          player = await Player.findById(event.player);
+        }
+        if (event.team) {
+          team = await Team.findById(event.team);
+        }
+        
+        return {
+          ...event.toObject ? event.toObject() : event,
+          player: player ? { 
+            _id: player._id, 
+            firstName: player.firstName, 
+            lastName: player.lastName, 
+            jerseyNumber: player.jerseyNumber 
+          } : event.player,
+          team: team ? { 
+            _id: team._id, 
+            name: team.name, 
+            city: team.city 
+          } : event.team
+        };
+      }));
+      
       return {
         ...game.toObject(),
         homeTeam: homeTeam ? { _id: homeTeam._id, name: homeTeam.name, city: homeTeam.city, colors: homeTeam.colors } : null,
         awayTeam: awayTeam ? { _id: awayTeam._id, name: awayTeam.name, city: awayTeam.city, colors: awayTeam.colors } : null,
-        season: season ? { _id: season._id, name: season.name, status: season.status } : (game.season ? { _id: game.season } : null)
+        season: season ? { _id: season._id, name: season.name, status: season.status } : (game.season ? { _id: game.season } : null),
+        events: populatedEvents
       };
     }));
     
@@ -183,6 +213,9 @@ router.put('/:id', [
       return res.status(400).json({ errors: errors.array() });
     }
 
+    // Get the old game to check previous status
+    const oldGame = await Game.findById(req.params.id);
+    
     const game = await Game.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -199,9 +232,10 @@ router.put('/:id', [
       await game.save();
     }
 
-    // If game is completed, update team statistics
-    if (game.status === 'completed') {
+    // If game is completed and wasn't completed before, update team and player statistics
+    if (game.status === 'completed' && (!oldGame || oldGame.status !== 'completed')) {
       await updateTeamStats(game);
+      await updatePlayerStats(game);
     }
     
     const populatedGame = await Game.findById(game._id)
@@ -307,6 +341,11 @@ router.post('/:id/events', [
 
     await game.save();
 
+    // Update player stats when event is added (if game is completed)
+    if (game.status === 'completed') {
+      await updatePlayerStatsForEvent(game, eventType, playerId);
+    }
+
     // Return updated game with populated events
     const updatedGame = await Game.findById(game._id)
       .populate('homeTeam', 'name city colors')
@@ -359,6 +398,115 @@ async function updateTeamStats(game) {
     awayTeam.ties += 1;
   }
   await awayTeam.save();
+}
+
+// Helper function to update player statistics based on game events
+// This processes all events in the game when it's marked as completed
+async function updatePlayerStats(game) {
+  if (!game.events || game.events.length === 0) return;
+
+  // Get all unique players who participated in this game
+  const playerIds = new Set();
+  const eventStats = new Map(); // Track stats per player to batch updates
+
+  // Process all events and aggregate stats
+  for (const event of game.events) {
+    if (!event.player) continue;
+    
+    const playerId = event.player.toString();
+    playerIds.add(playerId);
+
+    if (!eventStats.has(playerId)) {
+      eventStats.set(playerId, {
+        gamesPlayed: 0,
+        goals: 0,
+        assists: 0,
+        yellowCards: 0,
+        redCards: 0
+      });
+    }
+
+    const stats = eventStats.get(playerId);
+    
+    switch (event.type) {
+      case 'goal':
+        stats.goals += 1;
+        break;
+      case 'assist':
+        stats.assists += 1;
+        break;
+      case 'yellow_card':
+        stats.yellowCards += 1;
+        break;
+      case 'red_card':
+        stats.redCards += 1;
+        break;
+    }
+  }
+
+  // Update all players who participated (increment gamesPlayed once per player)
+  for (const playerId of playerIds) {
+    const player = await Player.findById(playerId);
+    if (!player) continue;
+
+    const stats = eventStats.get(playerId);
+    
+    // Initialize stats if they don't exist
+    if (!player.stats) {
+      player.stats = {
+        gamesPlayed: 0,
+        goals: 0,
+        assists: 0,
+        yellowCards: 0,
+        redCards: 0
+      };
+    }
+
+    // Increment gamesPlayed (once per player per game)
+    player.stats.gamesPlayed = (player.stats.gamesPlayed || 0) + 1;
+    
+    // Update event-based stats
+    player.stats.goals = (player.stats.goals || 0) + stats.goals;
+    player.stats.assists = (player.stats.assists || 0) + stats.assists;
+    player.stats.yellowCards = (player.stats.yellowCards || 0) + stats.yellowCards;
+    player.stats.redCards = (player.stats.redCards || 0) + stats.redCards;
+    
+    await player.save();
+  }
+}
+
+// Helper function to update player stats for a single event (when event is added to completed game)
+async function updatePlayerStatsForEvent(game, eventType, playerId) {
+  const player = await Player.findById(playerId);
+  if (!player) return;
+
+  // Update gamesPlayed if this is the first event for this player in this game
+  const playerEventsInGame = game.events.filter(e => 
+    e.player && e.player.toString() === playerId.toString()
+  );
+  
+  // If this is the first event for this player, increment gamesPlayed
+  if (playerEventsInGame.length === 1) {
+    player.stats.gamesPlayed = (player.stats.gamesPlayed || 0) + 1;
+  }
+
+  // Update stats based on event type
+  switch (eventType) {
+    case 'goal':
+      player.stats.goals = (player.stats.goals || 0) + 1;
+      break;
+    case 'assist':
+      player.stats.assists = (player.stats.assists || 0) + 1;
+      break;
+    case 'yellow_card':
+      player.stats.yellowCards = (player.stats.yellowCards || 0) + 1;
+      break;
+    case 'red_card':
+      player.stats.redCards = (player.stats.redCards || 0) + 1;
+      break;
+  }
+  
+  await player.save();
 }
 
 module.exports = router;

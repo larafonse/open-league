@@ -5,6 +5,7 @@ const Season = require('../models/Season');
 const Team = require('../models/Team');
 const Game = require('../models/Game');
 const League = require('../models/League');
+const Player = require('../models/Player');
 const authenticate = require('../middleware/auth');
 
 // Helper function to safely serialize a season with virtuals
@@ -900,6 +901,199 @@ router.delete('/:id/venues/:venueId', authenticate, async (req, res) => {
     res.json({ message: 'Venue removed from season successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Error removing venue from season', error: error.message });
+  }
+});
+
+// GET /api/seasons/:id/statistics - Get season statistics (top scorers and standings)
+router.get('/:id/statistics', authenticate, async (req, res) => {
+  try {
+    const season = await Season.findById(req.params.id)
+      .populate('teams', 'name city colors');
+    
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user has access to the league
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isPublic && !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to view statistics' });
+    }
+
+    // Get all completed games for this season with populated events
+    const games = await Game.find({ 
+      season: season._id,
+      status: 'completed'
+    })
+      .populate('homeTeam', 'name city colors')
+      .populate('awayTeam', 'name city colors')
+      .populate('events.player', 'firstName lastName jerseyNumber')
+      .populate('events.team', 'name city')
+      .sort({ actualDate: -1, scheduledDate: -1 });
+
+    // Calculate top scorers from game events
+    const scorersMap = new Map();
+
+    games.forEach((game) => {
+      if (game.events && Array.isArray(game.events)) {
+        game.events.forEach((event) => {
+          // Only count 'goal' events, not 'own_goal'
+          if (event.type === 'goal' && event.player) {
+            const playerId = typeof event.player === 'object' && event.player._id 
+              ? event.player._id.toString() 
+              : String(event.player);
+            
+            if (!scorersMap.has(playerId)) {
+              scorersMap.set(playerId, {
+                player: typeof event.player === 'object' ? {
+                  _id: event.player._id,
+                  firstName: event.player.firstName,
+                  lastName: event.player.lastName,
+                  jerseyNumber: event.player.jerseyNumber
+                } : null,
+                goals: 0,
+                team: typeof event.team === 'object' ? {
+                  _id: event.team._id,
+                  name: event.team.name,
+                  city: event.team.city
+                } : null,
+              });
+            }
+            
+            const scorer = scorersMap.get(playerId);
+            if (scorer) {
+              scorer.goals++;
+              // Update team if not set
+              if (!scorer.team && event.team) {
+                scorer.team = typeof event.team === 'object' ? {
+                  _id: event.team._id,
+                  name: event.team.name,
+                  city: event.team.city
+                } : null;
+              }
+            }
+          }
+        });
+      }
+    });
+
+    // Convert to array and sort by goals
+    const topScorers = Array.from(scorersMap.values())
+      .filter(s => s.player !== null && s.player !== undefined)
+      .sort((a, b) => b.goals - a.goals)
+      .slice(0, 10); // Top 10 scorers
+
+    // Calculate standings from games
+    const standingsMap = new Map();
+
+    // Initialize standings for all teams in the season
+    if (season.teams && Array.isArray(season.teams)) {
+      season.teams.forEach((team) => {
+        const teamId = typeof team === 'object' && team._id ? team._id.toString() : String(team);
+        standingsMap.set(teamId, {
+          team: typeof team === 'object' ? {
+            _id: team._id,
+            name: team.name,
+            city: team.city,
+            colors: team.colors
+          } : null,
+          MP: 0,
+          W: 0,
+          D: 0,
+          L: 0,
+          GF: 0,
+          GA: 0,
+          GD: 0,
+          Pts: 0,
+          last5: [],
+        });
+      });
+    }
+
+    // Process completed games
+    const completedGames = games
+      .filter(game => game.status === 'completed' && game.score)
+      .sort((a, b) => {
+        const dateA = new Date(a.actualDate || a.scheduledDate).getTime();
+        const dateB = new Date(b.actualDate || b.scheduledDate).getTime();
+        return dateB - dateA; // Most recent first
+      });
+
+    completedGames.forEach((game) => {
+      const homeTeamId = typeof game.homeTeam === 'object' && game.homeTeam._id 
+        ? game.homeTeam._id.toString() 
+        : String(game.homeTeam);
+      const awayTeamId = typeof game.awayTeam === 'object' && game.awayTeam._id 
+        ? game.awayTeam._id.toString() 
+        : String(game.awayTeam);
+      
+      const homeStanding = standingsMap.get(homeTeamId);
+      const awayStanding = standingsMap.get(awayTeamId);
+
+      if (homeStanding && awayStanding && game.score) {
+        const homeScore = game.score.homeTeam;
+        const awayScore = game.score.awayTeam;
+
+        // Update home team
+        homeStanding.MP++;
+        homeStanding.GF += homeScore;
+        homeStanding.GA += awayScore;
+        homeStanding.GD = homeStanding.GF - homeStanding.GA;
+
+        // Update away team
+        awayStanding.MP++;
+        awayStanding.GF += awayScore;
+        awayStanding.GA += homeScore;
+        awayStanding.GD = awayStanding.GF - awayStanding.GA;
+
+        // Determine result
+        if (homeScore > awayScore) {
+          homeStanding.W++;
+          homeStanding.Pts += 3;
+          awayStanding.L++;
+          homeStanding.last5.unshift('W');
+          awayStanding.last5.unshift('L');
+        } else if (awayScore > homeScore) {
+          awayStanding.W++;
+          awayStanding.Pts += 3;
+          homeStanding.L++;
+          homeStanding.last5.unshift('L');
+          awayStanding.last5.unshift('W');
+        } else {
+          homeStanding.D++;
+          homeStanding.Pts += 1;
+          awayStanding.D++;
+          awayStanding.Pts += 1;
+          homeStanding.last5.unshift('D');
+          awayStanding.last5.unshift('D');
+        }
+
+        // Keep only last 5 matches
+        if (homeStanding.last5.length > 5) homeStanding.last5 = homeStanding.last5.slice(0, 5);
+        if (awayStanding.last5.length > 5) awayStanding.last5 = awayStanding.last5.slice(0, 5);
+      }
+    });
+
+    // Convert to array and sort
+    const standings = Array.from(standingsMap.values())
+      .filter(s => s.team !== null && s.team !== undefined)
+      .sort((a, b) => {
+        // Sort by Points (desc), then GD (desc), then GF (desc)
+        if (b.Pts !== a.Pts) return b.Pts - a.Pts;
+        if (b.GD !== a.GD) return b.GD - a.GD;
+        return b.GF - a.GF;
+      });
+
+    res.json({
+      topScorers,
+      standings
+    });
+  } catch (error) {
+    console.error('Error fetching season statistics:', error);
+    res.status(500).json({ message: 'Error fetching statistics', error: error.message });
   }
 });
 

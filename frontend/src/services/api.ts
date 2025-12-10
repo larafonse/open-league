@@ -145,6 +145,8 @@ export const seasonsApi = {
     api.post(`/seasons/${id}/regenerate-schedule`).then(res => res.data),
   getStandings: (id: string): Promise<any[]> => 
     api.get(`/seasons/${id}/standings`).then(res => res.data),
+  getStatistics: (id: string): Promise<{ topScorers: any[]; standings: any[] }> => 
+    api.get(`/seasons/${id}/statistics`).then(res => res.data),
 };
 
 // Auth API
