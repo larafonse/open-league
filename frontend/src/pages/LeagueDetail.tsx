@@ -73,6 +73,11 @@ const LeagueDetail: React.FC = () => {
     scheduledDate: '',
     scheduledTime: '',
   });
+  const [showScoreDialog, setShowScoreDialog] = useState(false);
+  const [gameScoreData, setGameScoreData] = useState({
+    homeTeam: 0,
+    awayTeam: 0,
+  });
   const [newSeasonData, setNewSeasonData] = useState({
     name: '',
     description: '',
@@ -138,6 +143,16 @@ const LeagueDetail: React.FC = () => {
       fetchSeasons();
     }
   }, [id]);
+
+  // Reset tab to Overview if we're on a hidden tab when seasons become empty
+  useEffect(() => {
+    // When no seasons: Overview(0), Members(1), Settings(2) are valid
+    // When seasons exist: Overview(0), Teams(1), Games(2), Stats(3), Venues(4), Members(5), Settings(6) are valid
+    // So when seasons.length === 0, only tabValue 0, 1, 2 are valid
+    if (seasons.length === 0 && tabValue > 2) {
+      setTabValue(0);
+    }
+  }, [seasons.length, tabValue]);
 
   // Fetch teams, games, and venues when selected season changes
   useEffect(() => {
@@ -706,20 +721,25 @@ const LeagueDetail: React.FC = () => {
               variant="contained"
               color="primary"
               startIcon={<Add />}
-              onClick={() => setShowRegisterDialog(true)}
+              onClick={() => {
+                if (selectedSeason) {
+                  handleOpenRegisterDialog(selectedSeason);
+                }
+              }}
             >
               Register
-            </Button>
-          )}
-        </Box>
+                  </Button>
+                )}
+              </Box>
       </Box>
 
           <Card sx={{ mb: 3 }}>
         <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
           <Tab label="Overview" />
-          <Tab label="Teams" />
-          <Tab label="Games" />
-          <Tab label="Venues" />
+          {seasons.length > 0 && <Tab label="Teams" />}
+          {seasons.length > 0 && <Tab label="Games" />}
+          {seasons.length > 0 && <Tab label="Stats" />}
+          {seasons.length > 0 && <Tab label="Venues" />}
           <Tab label="Members" />
           {league.isOwner && <Tab label="Settings" />}
         </Tabs>
@@ -875,34 +895,16 @@ const LeagueDetail: React.FC = () => {
         </Grid>
       )}
 
-      {tabValue === 1 && (
+      {tabValue === 1 && seasons.length > 0 && (
           <Card>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="h6">Teams ({teams.length})</Typography>
-                {league.isOwner && (
-                  <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={() => {
-                      // Find a season in registration status, or use the selected season, or the first available season
-                      const registrationSeason = seasons.find(s => s.status === 'registration');
-                      const seasonToUse = registrationSeason || selectedSeason || seasons[0];
-                      if (seasonToUse) {
-                        handleOpenRegisterDialog(seasonToUse);
-                      } else {
-                        alert('No seasons available for registration. Please create a season first.');
-                      }
-                    }}
-                  >
-                    Register
-                  </Button>
-                )}
             </Box>
             {teams.length === 0 ? (
               <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
                 No teams in this league yet. Teams are added when you create seasons.
-              </Typography>
+                </Typography>
             ) : (
               <TableContainer component={Paper}>
                 <Table>
@@ -986,7 +988,7 @@ const LeagueDetail: React.FC = () => {
         </Card>
       )}
 
-      {tabValue === 2 && (
+      {tabValue === 2 && seasons.length > 0 && (
           <Card>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -1017,8 +1019,8 @@ const LeagueDetail: React.FC = () => {
                     Next Week
                   </Button>
                 </Box>
-              )}
-            </Box>
+                )}
+              </Box>
             {!selectedSeason ? (
               <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
                 Please select a season to view games.
@@ -1143,32 +1145,77 @@ const LeagueDetail: React.FC = () => {
                                 />
                               </TableCell>
                               <TableCell>
-                                {game.status === 'completed' && game.score
+                                {game.score && (game.status === 'completed' || game.status === 'in_progress')
                                   ? `${game.score.homeTeam} - ${game.score.awayTeam}`
                                   : '—'}
                               </TableCell>
                               {(league.isMember || league.isOwner) && (
                                 <TableCell onClick={(e) => e.stopPropagation()}>
-                                  {game.status === 'pending' && (
-                                    <Button
-                                      size="small"
-                                      variant="outlined"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setSelectedGame(game);
-                                        setGameVenueData({
-                                          venueName: game.venue?.name || '',
-                                          venueAddress: game.venue?.address || '',
-                                          scheduledDate: game.scheduledDate ? new Date(game.scheduledDate).toISOString().split('T')[0] : '',
-                                          scheduledTime: game.scheduledDate ? new Date(game.scheduledDate).toTimeString().slice(0, 5) : '',
-                                        });
-                                        setShowSetVenueDialog(true);
-                                      }}
-                                    >
-                                      Set Venue & Time
-                                    </Button>
-                                  )}
+                                  <Box display="flex" gap={1}>
+                                    {game.status === 'pending' && (
+                                      <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setSelectedGame(game);
+                                          setGameVenueData({
+                                            venueName: game.venue?.name || '',
+                                            venueAddress: game.venue?.address || '',
+                                            scheduledDate: game.scheduledDate ? new Date(game.scheduledDate).toISOString().split('T')[0] : '',
+                                            scheduledTime: game.scheduledDate ? new Date(game.scheduledDate).toTimeString().slice(0, 5) : '',
+                                          });
+                                          setShowSetVenueDialog(true);
+                                        }}
+                                      >
+                                        Set Venue & Time
+                                      </Button>
+                                    )}
+                                    {game.status === 'scheduled' && (
+                                      <Button
+                                        size="small"
+                                        variant="contained"
+                                        color="success"
+                                        startIcon={<PlayArrow />}
+                                        onClick={async (e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          if (window.confirm(`Start the game between ${typeof game.homeTeam === 'object' ? game.homeTeam.name : 'Home'} and ${typeof game.awayTeam === 'object' ? game.awayTeam.name : 'Away'}?`)) {
+                                            try {
+                                              await gamesApi.update(game._id, { status: 'in_progress' });
+                                              await fetchGames();
+                                              alert('Game started successfully!');
+                                            } catch (error) {
+                                              console.error('Error starting game:', error);
+                                              alert('Error starting game. Please try again.');
+                                            }
+                                          }
+                                        }}
+                                      >
+                                        Start Game
+                                      </Button>
+                                    )}
+                                    {game.status === 'in_progress' && (
+                                      <Button
+                                        size="small"
+                                        variant="contained"
+                                        color="warning"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setSelectedGame(game);
+                                          setGameScoreData({
+                                            homeTeam: game.score?.homeTeam || 0,
+                                            awayTeam: game.score?.awayTeam || 0,
+                                          });
+                                          setShowScoreDialog(true);
+                                        }}
+                                      >
+                                        Update Score
+                                      </Button>
+                                    )}
+                                  </Box>
                                 </TableCell>
                               )}
                             </TableRow>
@@ -1183,7 +1230,241 @@ const LeagueDetail: React.FC = () => {
         </Card>
       )}
 
-      {tabValue === 3 && (
+      {tabValue === 3 && seasons.length > 0 && (
+        <Card>
+          <CardContent>
+            <Box mb={3}>
+              <Typography variant="h6" gutterBottom>
+                Standings
+              </Typography>
+              {selectedSeason && (
+                <Typography variant="body2" color="textSecondary">
+                  Season: {selectedSeason.name}
+                </Typography>
+              )}
+            </Box>
+            {selectedSeason ? (() => {
+              // Calculate standings from games
+              type StandingData = {
+                team: any;
+                MP: number;
+                W: number;
+                D: number;
+                L: number;
+                GF: number;
+                GA: number;
+                GD: number;
+                Pts: number;
+                last5: Array<'W' | 'D' | 'L'>;
+              };
+              const standingsMap = new Map<string, StandingData>();
+
+              // Initialize standings for all teams in the season
+              if (selectedSeason.teams && Array.isArray(selectedSeason.teams)) {
+                selectedSeason.teams.forEach((team: any) => {
+                  const teamId = typeof team === 'object' && team._id ? team._id.toString() : String(team);
+                  standingsMap.set(teamId, {
+                    team: typeof team === 'object' ? team : null,
+                    MP: 0,
+                    W: 0,
+                    D: 0,
+                    L: 0,
+                    GF: 0,
+                    GA: 0,
+                    GD: 0,
+                    Pts: 0,
+                    last5: [],
+                  });
+                });
+              }
+
+              // Process completed games
+              const completedGames = games
+                .filter(game => game.status === 'completed' && game.score)
+                .sort((a, b) => {
+                  const dateA = new Date(a.actualDate || a.scheduledDate).getTime();
+                  const dateB = new Date(b.actualDate || b.scheduledDate).getTime();
+                  return dateB - dateA; // Most recent first
+                });
+
+              completedGames.forEach((game) => {
+                const homeTeamId = typeof game.homeTeam === 'object' && game.homeTeam._id ? game.homeTeam._id.toString() : String(game.homeTeam);
+                const awayTeamId = typeof game.awayTeam === 'object' && game.awayTeam._id ? game.awayTeam._id.toString() : String(game.awayTeam);
+                
+                const homeStanding = standingsMap.get(homeTeamId);
+                const awayStanding = standingsMap.get(awayTeamId);
+
+                if (homeStanding && awayStanding && game.score) {
+                  const homeScore = game.score.homeTeam;
+                  const awayScore = game.score.awayTeam;
+
+                  // Update home team
+                  homeStanding.MP++;
+                  homeStanding.GF += homeScore;
+                  homeStanding.GA += awayScore;
+                  homeStanding.GD = homeStanding.GF - homeStanding.GA;
+
+                  // Update away team
+                  awayStanding.MP++;
+                  awayStanding.GF += awayScore;
+                  awayStanding.GA += homeScore;
+                  awayStanding.GD = awayStanding.GF - awayStanding.GA;
+
+                  // Determine result
+                  if (homeScore > awayScore) {
+                    homeStanding.W++;
+                    homeStanding.Pts += 3;
+                    awayStanding.L++;
+                    homeStanding.last5.unshift('W');
+                    awayStanding.last5.unshift('L');
+                  } else if (awayScore > homeScore) {
+                    awayStanding.W++;
+                    awayStanding.Pts += 3;
+                    homeStanding.L++;
+                    homeStanding.last5.unshift('L');
+                    awayStanding.last5.unshift('W');
+                  } else {
+                    homeStanding.D++;
+                    homeStanding.Pts += 1;
+                    awayStanding.D++;
+                    awayStanding.Pts += 1;
+                    homeStanding.last5.unshift('D');
+                    awayStanding.last5.unshift('D');
+                  }
+
+                  // Keep only last 5 matches
+                  if (homeStanding.last5.length > 5) homeStanding.last5 = homeStanding.last5.slice(0, 5);
+                  if (awayStanding.last5.length > 5) awayStanding.last5 = awayStanding.last5.slice(0, 5);
+                }
+              });
+
+              // Convert to array and sort
+              const standings = Array.from(standingsMap.values())
+                .filter(s => s.team !== null && s.team !== undefined)
+                .sort((a, b) => {
+                  // Sort by Points (desc), then GD (desc), then GF (desc)
+                  if (b.Pts !== a.Pts) return b.Pts - a.Pts;
+                  if (b.GD !== a.GD) return b.GD - a.GD;
+                  return b.GF - a.GF;
+                });
+
+              return standings.length > 0 ? (
+                <TableContainer component={Paper}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Rank</TableCell>
+                        <TableCell>Club</TableCell>
+                        <TableCell align="center">MP</TableCell>
+                        <TableCell align="center">W</TableCell>
+                        <TableCell align="center">D</TableCell>
+                        <TableCell align="center">L</TableCell>
+                        <TableCell align="center">GF</TableCell>
+                        <TableCell align="center">GA</TableCell>
+                        <TableCell align="center">GD</TableCell>
+                        <TableCell align="center">Pts</TableCell>
+                        <TableCell align="center">Last 5</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {standings.map((standing, index) => {
+                        const team = standing.team;
+                        if (!team) return null;
+                        const teamId = typeof team === 'object' && team._id ? team._id : String(team);
+                        return (
+                          <TableRow key={teamId} hover>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="bold">
+                              {index + 1}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="medium">
+                              {typeof team === 'object' ? team.name : '—'}
+                            </Typography>
+                            {typeof team === 'object' && team.city && (
+                              <Typography variant="caption" color="textSecondary">
+                                {team.city}
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">{standing.MP}</Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">{standing.W}</Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">{standing.D}</Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">{standing.L}</Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">{standing.GF}</Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">{standing.GA}</Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2" color={standing.GD > 0 ? 'success.main' : standing.GD < 0 ? 'error.main' : 'text.secondary'}>
+                              {standing.GD > 0 ? '+' : ''}{standing.GD}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2" fontWeight="bold">
+                              {standing.Pts}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Box display="flex" gap={0.5} justifyContent="center">
+                              {standing.last5.length > 0 ? (
+                                standing.last5.map((result, idx) => (
+                                  <Chip
+                                    key={idx}
+                                    label={result}
+                                    size="small"
+                                    sx={{
+                                      minWidth: 32,
+                                      height: 24,
+                                      fontSize: '0.7rem',
+                                      bgcolor: result === 'W' ? 'success.main' : result === 'D' ? 'warning.main' : 'error.main',
+                                      color: 'white',
+                                    }}
+                                  />
+                                ))
+                              ) : (
+                                <Typography variant="caption" color="textSecondary">
+                                  —
+                                </Typography>
+                              )}
+                            </Box>
+                          </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Box textAlign="center" py={4}>
+                  <Typography variant="body2" color="textSecondary">
+                    No teams registered for this season.
+                  </Typography>
+                </Box>
+              );
+            })() : (
+              <Box textAlign="center" py={4}>
+                <Typography variant="body2" color="textSecondary">
+                  Please select a season to view standings.
+                </Typography>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tabValue === 4 && seasons.length > 0 && (
         <Card>
           <CardContent>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -1284,22 +1565,9 @@ const LeagueDetail: React.FC = () => {
         </Card>
       )}
 
-      {tabValue === 4 && (
+      {((seasons.length === 0 && tabValue === 1) || (seasons.length > 0 && tabValue === 5)) && (
           <Card>
             <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6">Members & Players</Typography>
-                {league.isOwner && (
-                  <Button
-                  variant="contained"
-                  startIcon={<Add />}
-                    onClick={() => setShowAddMemberDialog(true)}
-                  >
-                    Add Member
-                  </Button>
-                )}
-              </Box>
-              
               {/* League Members Section */}
               <Box mb={4}>
                 <Typography variant="h6" gutterBottom>League Members</Typography>
@@ -1317,7 +1585,7 @@ const LeagueDetail: React.FC = () => {
                   <Chip label="Owner" color="secondary" size="small" />
                 </ListItem>
                 {league.members && league.members.length > 0 && <Divider sx={{ my: 1 }} />}
-                {league.members && league.members.length > 0 ? (
+                {league.members && league.members.length > 0 && (
                   league.members.map((member, index) => (
                     <React.Fragment key={member._id}>
                       <ListItem>
@@ -1343,14 +1611,6 @@ const LeagueDetail: React.FC = () => {
                       {index < league.members.length - 1 && <Divider />}
                     </React.Fragment>
                   ))
-                ) : (
-                  <ListItem>
-                    <ListItemText
-                      primary="No additional members"
-                      secondary="Only the owner is a member of this league"
-                      sx={{ textAlign: 'center', py: 2 }}
-                      />
-                    </ListItem>
                 )}
               </List>
               </Box>
@@ -1418,7 +1678,7 @@ const LeagueDetail: React.FC = () => {
           </Card>
       )}
 
-      {tabValue === 5 && league.isOwner && (
+      {((seasons.length === 0 && tabValue === 2) || (seasons.length > 0 && tabValue === 6)) && league.isOwner && (
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -2516,6 +2776,134 @@ const LeagueDetail: React.FC = () => {
             disabled={!gameVenueData.venueName || !gameVenueData.scheduledDate || !gameVenueData.scheduledTime}
           >
             Set Venue & Time
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Update Score Dialog */}
+      <Dialog 
+        open={showScoreDialog} 
+        onClose={() => {
+          setShowScoreDialog(false);
+          setSelectedGame(null);
+          setGameScoreData({
+            homeTeam: 0,
+            awayTeam: 0,
+          });
+        }} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          Update Score {selectedGame && `- ${typeof selectedGame.homeTeam === 'object' ? selectedGame.homeTeam.name : 'Home'} vs ${typeof selectedGame.awayTeam === 'object' ? selectedGame.awayTeam.name : 'Away'}`}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Box display="flex" alignItems="center" gap={2} mb={3}>
+              <Box flex={1}>
+                <Typography variant="body2" color="textSecondary" gutterBottom>
+                  {typeof selectedGame?.homeTeam === 'object' ? selectedGame.homeTeam.name : 'Home Team'}
+                </Typography>
+                <TextField
+                  fullWidth
+                  label="Score"
+                  type="number"
+                  value={gameScoreData.homeTeam}
+                  onChange={(e) => setGameScoreData({ ...gameScoreData, homeTeam: parseInt(e.target.value) || 0 })}
+                  inputProps={{ min: 0 }}
+                  margin="normal"
+                />
+              </Box>
+              <Typography variant="h4" sx={{ mt: 3 }}>
+                -
+              </Typography>
+              <Box flex={1}>
+                <Typography variant="body2" color="textSecondary" gutterBottom>
+                  {typeof selectedGame?.awayTeam === 'object' ? selectedGame.awayTeam.name : 'Away Team'}
+                </Typography>
+                <TextField
+                  fullWidth
+                  label="Score"
+                  type="number"
+                  value={gameScoreData.awayTeam}
+                  onChange={(e) => setGameScoreData({ ...gameScoreData, awayTeam: parseInt(e.target.value) || 0 })}
+                  inputProps={{ min: 0 }}
+                  margin="normal"
+                />
+              </Box>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setShowScoreDialog(false);
+              setSelectedGame(null);
+              setGameScoreData({
+                homeTeam: 0,
+                awayTeam: 0,
+              });
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              if (!selectedGame) return;
+              try {
+                await gamesApi.update(selectedGame._id, {
+                  score: {
+                    homeTeam: gameScoreData.homeTeam,
+                    awayTeam: gameScoreData.awayTeam,
+                  },
+                });
+                
+                await fetchGames();
+                setShowScoreDialog(false);
+                setSelectedGame(null);
+                setGameScoreData({
+                  homeTeam: 0,
+                  awayTeam: 0,
+                });
+                alert('Score updated successfully!');
+              } catch (error) {
+                console.error('Error updating score:', error);
+                alert('Error updating score. Please try again.');
+              }
+            }}
+            variant="outlined"
+          >
+            Update Score
+          </Button>
+          <Button
+            onClick={async () => {
+              if (!selectedGame) return;
+              try {
+                await gamesApi.update(selectedGame._id, {
+                  status: 'completed',
+                  score: {
+                    homeTeam: gameScoreData.homeTeam,
+                    awayTeam: gameScoreData.awayTeam,
+                  },
+                });
+                
+                await fetchGames();
+                setShowScoreDialog(false);
+                setSelectedGame(null);
+                setGameScoreData({
+                  homeTeam: 0,
+                  awayTeam: 0,
+                });
+                alert('Game completed successfully!');
+              } catch (error) {
+                console.error('Error completing game:', error);
+                alert('Error completing game. Please try again.');
+              }
+            }}
+            variant="contained"
+            color="success"
+          >
+            Complete Game
           </Button>
         </DialogActions>
       </Dialog>
