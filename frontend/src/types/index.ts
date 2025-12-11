@@ -10,6 +10,22 @@ export interface BaseUser {
   leagueLimit?: number;
 }
 
+export interface Invitation {
+  _id: string;
+  email: string;
+  type: 'team' | 'league';
+  team?: BaseTeam;
+  league?: BaseLeague;
+  season?: BaseSeason;
+  invitedBy: BaseUser;
+  status: 'pending' | 'accepted' | 'declined';
+  acceptedAt?: string;
+  declinedAt?: string;
+  user?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BaseTeam {
   _id: string;
   name: string;

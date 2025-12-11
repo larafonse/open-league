@@ -20,6 +20,12 @@ import {
   IconButton,
   Button,
   Divider,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -30,16 +36,27 @@ import {
   Edit,
   Delete,
   Person,
+  Mail,
+  Add,
 } from '@mui/icons-material';
-import { teamsApi, playersApi } from '../services/api';
+import { teamsApi, playersApi, invitationsApi } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 import type { Team, Player } from '../types';
 import SoccerPitch from '../components/SoccerPitch';
 
 const TeamDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteEmails, setInviteEmails] = useState<string[]>([]);
+  const [inviteEmailInput, setInviteEmailInput] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+  const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [inviteResults, setInviteResults] = useState<{ email: string; success: boolean; message?: string }[]>([]);
 
   useEffect(() => {
     if (id) {
@@ -68,6 +85,102 @@ const TeamDetail: React.FC = () => {
       }
     }
   };
+
+  const handleAddEmail = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && inviteEmailInput.trim()) {
+      e.preventDefault();
+      const email = inviteEmailInput.trim().toLowerCase();
+      
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        setInviteError('Please enter a valid email address');
+        return;
+      }
+      
+      // Check for duplicates
+      if (inviteEmails.includes(email)) {
+        setInviteError('This email has already been added');
+        return;
+      }
+      
+      setInviteEmails([...inviteEmails, email]);
+      setInviteEmailInput('');
+      setInviteError('');
+    }
+  };
+
+  const handleRemoveEmail = (emailToRemove: string) => {
+    setInviteEmails(inviteEmails.filter(email => email !== emailToRemove));
+  };
+
+  const handleInvitePlayers = async () => {
+    if (inviteEmails.length === 0) {
+      setInviteError('Please add at least one email address');
+      return;
+    }
+
+    setInviting(true);
+    setInviteError('');
+    setInviteSuccess(false);
+    setInviteResults([]);
+
+    const results: { email: string; success: boolean; message?: string }[] = [];
+
+    try {
+      // Send invitations for all emails
+                await Promise.allSettled(
+                  inviteEmails.map(async (email) => {
+                    try {
+                      await invitationsApi.createTeamInvitation(id!, email);
+                      results.push({ email, success: true });
+                    } catch (error: any) {
+                      const errorMessage = error.response?.data?.message || 
+                                         error.response?.data?.error || 
+                                         error.message || 
+                                         'Error sending invitation';
+                      console.error(`Error inviting ${email}:`, error);
+                      results.push({ 
+                        email, 
+                        success: false, 
+                        message: errorMessage
+                      });
+                    }
+                  })
+                );
+
+      setInviteResults(results);
+      const successCount = results.filter(r => r.success).length;
+      
+      if (successCount > 0) {
+        setInviteSuccess(true);
+        // Clear emails after successful sends
+        setInviteEmails([]);
+        
+        // Close dialog after a delay if all succeeded
+        if (successCount === inviteEmails.length) {
+          setTimeout(() => {
+            setShowInviteDialog(false);
+            setInviteSuccess(false);
+            setInviteResults([]);
+          }, 3000);
+        }
+      } else {
+        setInviteError('Failed to send all invitations');
+      }
+    } catch (error: any) {
+      setInviteError('Error sending invitations');
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  // Check if user is the coach of this team
+  const isCoach = user && team && team.coach && (
+    typeof team.coach === 'object' 
+      ? team.coach._id === user._id 
+      : team.coach === user._id
+  );
 
   if (loading) {
     return (
@@ -377,14 +490,26 @@ const TeamDetail: React.FC = () => {
                 <Typography variant="h6">
                   Players ({players.length})
                 </Typography>
-                <Button
-                  variant="contained"
-                  startIcon={<Person />}
-                  component={Link}
-                  to="/players"
-                >
-                  Add Player
-                </Button>
+                <Box display="flex" gap={1}>
+                  {isCoach && (
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<Mail />}
+                      onClick={() => setShowInviteDialog(true)}
+                    >
+                      Invite Player
+                    </Button>
+                  )}
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    component={Link}
+                    to="/players"
+                  >
+                    View All Players
+                  </Button>
+                </Box>
               </Box>
               {players.length > 0 ? (
                 <TableContainer>
@@ -469,6 +594,99 @@ const TeamDetail: React.FC = () => {
           </Card>
         </Grid>
       </Grid>
+
+      {/* Invite Player Dialog */}
+      <Dialog open={showInviteDialog} onClose={() => {
+        setShowInviteDialog(false);
+        setInviteEmails([]);
+        setInviteEmailInput('');
+        setInviteError('');
+        setInviteSuccess(false);
+        setInviteResults([]);
+      }} maxWidth="sm" fullWidth>
+        <DialogTitle>Invite Players to {team.name}</DialogTitle>
+        <DialogContent>
+          {inviteSuccess && inviteResults.length > 0 && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {inviteResults.filter(r => r.success).length} of {inviteResults.length} invitation{inviteResults.length > 1 ? 's' : ''} sent successfully!
+            </Alert>
+          )}
+          {inviteError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {inviteError}
+            </Alert>
+          )}
+          {inviteResults.some(r => !r.success) && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Some invitations failed:
+              </Typography>
+              {inviteResults.filter(r => !r.success).map((result, idx) => (
+                <Typography key={idx} variant="body2">
+                  {result.email}: {result.message}
+                </Typography>
+              ))}
+            </Alert>
+          )}
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Enter email addresses and press Enter to add them. If they already have an account, they'll see the invitation in their dashboard. If not, they'll see it when they sign up.
+          </Typography>
+          
+          {/* Email Chips */}
+          {inviteEmails.length > 0 && (
+            <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {inviteEmails.map((email) => (
+                <Chip
+                  key={email}
+                  label={email}
+                  onDelete={() => handleRemoveEmail(email)}
+                  color="primary"
+                  variant="outlined"
+                />
+              ))}
+            </Box>
+          )}
+          
+          <TextField
+            fullWidth
+            label="Email Addresses"
+            type="email"
+            value={inviteEmailInput}
+            onChange={(e) => {
+              setInviteEmailInput(e.target.value);
+              setInviteError('');
+            }}
+            onKeyDown={handleAddEmail}
+            placeholder="Enter email and press Enter to add"
+            margin="normal"
+            disabled={inviting || inviteSuccess}
+            helperText="Press Enter to add each email address"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setShowInviteDialog(false);
+              setInviteEmails([]);
+              setInviteEmailInput('');
+              setInviteError('');
+              setInviteSuccess(false);
+              setInviteResults([]);
+            }}
+            disabled={inviting}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleInvitePlayers}
+            variant="contained"
+            startIcon={<Mail />}
+            disabled={inviting || inviteSuccess || inviteEmails.length === 0}
+          >
+            {inviting ? `Sending ${inviteEmails.length} invitation${inviteEmails.length > 1 ? 's' : ''}...` : `Send ${inviteEmails.length} Invitation${inviteEmails.length > 1 ? 's' : ''}`}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

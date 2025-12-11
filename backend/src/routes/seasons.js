@@ -256,6 +256,15 @@ router.post('/:id/register-team', authenticate, [
       return res.status(404).json({ message: 'Team not found' });
     }
 
+    // For coach/player users, verify they are the coach of the team
+    if (req.user.userType === 'coach_player') {
+      const teamCoachId = team.coach ? (typeof team.coach === 'object' ? team.coach._id.toString() : team.coach.toString()) : null;
+      if (teamCoachId !== req.user._id.toString()) {
+        return res.status(403).json({ message: 'You can only register teams that you coach' });
+      }
+    }
+    // League admins can register any team
+
     // Check if team is already registered
     const teamIds = (season.teams || []).map((t) => {
       if (typeof t === 'string') return t;
@@ -300,9 +309,6 @@ router.get('/:id/available-teams', authenticate, async (req, res) => {
     if (!league.isPublic && !league.isMember(req.user._id)) {
       return res.status(403).json({ message: 'You must be a member of this league to view available teams' });
     }
-
-    // Get all teams
-    const allTeams = await Team.find().select('name city colors players captain');
     
     // Get teams already registered to this season
     const registeredTeamIds = (season.teams || []).map((t) => {
@@ -311,6 +317,17 @@ router.get('/:id/available-teams', authenticate, async (req, res) => {
       if (t && t._id) return t._id.toString();
       return t;
     });
+
+    // For coach/player users, only show teams they coach
+    // For league admins, show all teams
+    let query = {};
+    if (req.user.userType === 'coach_player') {
+      query.coach = req.user._id;
+    }
+    
+    const allTeams = await Team.find(query)
+      .populate('coach', 'firstName lastName email')
+      .select('name city colors players captain coach');
 
     // Filter out teams that are already registered
     const availableTeams = allTeams.filter(team => {

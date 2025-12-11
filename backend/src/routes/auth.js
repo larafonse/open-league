@@ -3,6 +3,7 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Invitation = require('../models/Invitation');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
@@ -10,6 +11,24 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 const generateToken = (userId) => {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
 };
+
+// GET /api/auth/check-invitations/:email - Check for pending invitations by email (before signup)
+router.get('/check-invitations/:email', async (req, res) => {
+  try {
+    const normalizedEmail = req.params.email.toLowerCase().trim();
+    const invitations = await Invitation.find({
+      email: normalizedEmail,
+      status: 'pending'
+    })
+      .populate('team', 'name city colors')
+      .populate('invitedBy', 'firstName lastName email')
+      .sort({ createdAt: -1 });
+
+    res.json(invitations);
+  } catch (error) {
+    res.status(500).json({ message: 'Error checking invitations', error: error.message });
+  }
+});
 
 // POST /api/auth/signup - Register new user
 router.post('/signup', [
@@ -59,6 +78,24 @@ router.post('/signup', [
 
     await user.save();
 
+    // Check for pending invitations for this email
+    const normalizedEmail = email.toLowerCase().trim();
+    const pendingInvitations = await Invitation.find({
+      email: normalizedEmail,
+      status: 'pending'
+    })
+      .populate('team', 'name city colors')
+      .populate('league', 'name description')
+      .populate('invitedBy', 'firstName lastName email');
+
+    // Update invitations to link to user
+    if (pendingInvitations.length > 0) {
+      await Invitation.updateMany(
+        { email: normalizedEmail, status: 'pending' },
+        { $set: { user: user._id } }
+      );
+    }
+
     // Generate token
     const token = generateToken(user._id);
 
@@ -74,7 +111,8 @@ router.post('/signup', [
         userType: user.userType,
         tier: user.tier,
         leagueLimit: user.leagueLimit
-      }
+      },
+      pendingInvitations: pendingInvitations.length > 0 ? pendingInvitations : undefined
     });
   } catch (error) {
     console.error('Signup error:', error);

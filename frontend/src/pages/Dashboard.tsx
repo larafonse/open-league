@@ -14,37 +14,47 @@ import {
   ListItemSecondaryAction,
   Avatar,
   Divider,
-  Grid } from '@mui/material';
+  Grid,
+  Button,
+} from '@mui/material';
 import {
   People,
   Person,
   CalendarToday,
   EmojiEvents,
+  Mail,
+  Check,
+  Close,
 } from '@mui/icons-material';
-import { teamsApi, playersApi, gamesApi, standingsApi } from '../services/api';
-import type { Team, Player, Game, Standing } from '../types';
+import { teamsApi, playersApi, gamesApi, standingsApi, invitationsApi } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import type { Team, Player, Game, Standing, Invitation } from '../types';
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [teams, setTeams] = useState<Team[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [teamsData, playersData, gamesData, standingsData] = await Promise.all([
+        const [teamsData, playersData, gamesData, standingsData, invitationsData] = await Promise.all([
           teamsApi.getAll(),
           playersApi.getAll(),
           gamesApi.getAll(),
           standingsApi.getAll(),
+          invitationsApi.getAll().catch(() => []), // Fail silently if not authenticated
         ]);
 
         setTeams(teamsData);
         setPlayers(playersData);
         setGames(gamesData);
         setStandings(standingsData);
+        setInvitations(invitationsData);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -54,6 +64,39 @@ const Dashboard: React.FC = () => {
 
     fetchData();
   }, []);
+
+  const handleAcceptInvitation = async (invitationId: string) => {
+    try {
+      await invitationsApi.accept(invitationId);
+      // Refresh data
+      const [teamsData, playersData, invitationsData] = await Promise.all([
+        teamsApi.getAll(),
+        playersApi.getAll(),
+        invitationsApi.getAll(),
+      ]);
+      setTeams(teamsData);
+      setPlayers(playersData);
+      setInvitations(invitationsData);
+      
+      // If it's a league invitation, navigate to that league
+      const invitation = invitations.find(inv => inv._id === invitationId);
+      if (invitation?.type === 'league' && invitation.league) {
+        navigate(`/leagues/${invitation.league._id}`);
+      }
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Error accepting invitation');
+    }
+  };
+
+  const handleDeclineInvitation = async (invitationId: string) => {
+    try {
+      await invitationsApi.decline(invitationId);
+      const invitationsData = await invitationsApi.getAll();
+      setInvitations(invitationsData);
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Error declining invitation');
+    }
+  };
 
   const recentGames = games
     .filter(game => game.status === 'completed')
@@ -105,6 +148,109 @@ const Dashboard: React.FC = () => {
           Welcome to your sports league management system
         </Typography>
       </Box>
+
+      {/* Pending Invitations */}
+      {invitations.length > 0 && (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Box display="flex" alignItems="center" mb={2}>
+              <Mail sx={{ mr: 1, color: 'primary.main' }} />
+              <Typography variant="h5" component="h2">
+                Pending Invitations
+              </Typography>
+            </Box>
+            <List>
+              {invitations.map((invitation, index) => (
+                <React.Fragment key={invitation._id}>
+                  <ListItem>
+                    {invitation.type === 'team' && invitation.team ? (
+                      <>
+                        <Avatar
+                          sx={{
+                            bgcolor: invitation.team.colors.primary,
+                            color: invitation.team.colors.secondary,
+                            mr: 2,
+                          }}
+                        >
+                          {invitation.team.name.charAt(0)}
+                        </Avatar>
+                        <ListItemText
+                          primary={
+                            <Typography variant="body1" fontWeight="medium">
+                              {invitation.team.name}
+                            </Typography>
+                          }
+                          secondary={
+                            <Box>
+                              <Typography variant="body2" color="textSecondary">
+                                {invitation.team.city} • Team Invitation • Invited by {invitation.invitedBy.firstName} {invitation.invitedBy.lastName}
+                              </Typography>
+                              <Typography variant="caption" color="textSecondary">
+                                {new Date(invitation.createdAt).toLocaleDateString()}
+                              </Typography>
+                            </Box>
+                          }
+                        />
+                      </>
+                    ) : invitation.type === 'league' && invitation.league ? (
+                      <>
+                        <Avatar
+                          sx={{
+                            bgcolor: 'primary.main',
+                            color: 'primary.contrastText',
+                            mr: 2,
+                          }}
+                        >
+                          {invitation.league.name.charAt(0)}
+                        </Avatar>
+                        <ListItemText
+                          primary={
+                            <Typography variant="body1" fontWeight="medium">
+                              {invitation.league.name}
+                            </Typography>
+                          }
+                          secondary={
+                            <Box>
+                              <Typography variant="body2" color="textSecondary">
+                                League Invitation • Create your team • Invited by {invitation.invitedBy.firstName} {invitation.invitedBy.lastName}
+                              </Typography>
+                              <Typography variant="caption" color="textSecondary">
+                                {new Date(invitation.createdAt).toLocaleDateString()}
+                              </Typography>
+                            </Box>
+                          }
+                        />
+                      </>
+                    ) : null}
+                    <ListItemSecondaryAction>
+                      <Button
+                        variant="contained"
+                        color="success"
+                        size="small"
+                        startIcon={<Check />}
+                        onClick={() => handleAcceptInvitation(invitation._id)}
+                        sx={{ mr: 1 }}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        startIcon={<Close />}
+                        onClick={() => handleDeclineInvitation(invitation._id)}
+                      >
+                        Decline
+                      </Button>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  {index < invitations.length - 1 && <Divider />}
+                </React.Fragment>
+              ))}
+            </List>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <Grid container spacing={3} mb={4}>

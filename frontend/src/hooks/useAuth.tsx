@@ -74,6 +74,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setToken(response.token);
     setUser(response.user);
     localStorage.setItem('token', response.token);
+    return response; // Return response so signup page can check for invitations
   };
 
   const logout = () => {

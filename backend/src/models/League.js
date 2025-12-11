@@ -15,10 +15,13 @@ const leagueSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  members: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
+  members: {
+    type: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }],
+    default: []
+  },
   teams: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Team'
@@ -48,7 +51,7 @@ leagueSchema.index({ name: 'text', description: 'text' });
 
 // Virtual for member count
 leagueSchema.virtual('memberCount').get(function() {
-  return this.members.length + 1; // +1 for owner
+  return (this.members && this.members.length ? this.members.length : 0) + 1; // +1 for owner
 });
 
 // Method to check if user is a member

@@ -210,7 +210,7 @@ const Teams: React.FC = () => {
                     }
                   }}
                   renderInput={(params) => (
-                    <TextField
+                <TextField
                       {...params}
                       label="Coach/Manager"
                       placeholder={user ? `Default: ${user.firstName} ${user.lastName} (you)` : 'Search users...'}

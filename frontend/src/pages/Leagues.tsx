@@ -212,7 +212,7 @@ const Leagues: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {leagues.map((league) => (
+          {leagues.map((league) => (
                 <TableRow 
                   key={league._id} 
                   hover
@@ -237,7 +237,7 @@ const Leagues: React.FC = () => {
                         <Groups />
                       </Avatar>
                       <Typography variant="subtitle1" fontWeight="medium">
-                        {league.name}
+                      {league.name}
                       </Typography>
                     </Box>
                   </TableCell>
@@ -248,18 +248,18 @@ const Leagues: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Box display="flex" alignItems="center">
-                      {league.isPublic ? (
+                    {league.isPublic ? (
                         <>
                           <Public fontSize="small" color="action" sx={{ mr: 0.5 }} />
                           <Typography variant="body2">Public</Typography>
                         </>
-                      ) : (
+                    ) : (
                         <>
                           <Lock fontSize="small" color="action" sx={{ mr: 0.5 }} />
                           <Typography variant="body2">Private</Typography>
                         </>
-                      )}
-                    </Box>
+                    )}
+                  </Box>
                   </TableCell>
                   <TableCell>
                     <Box display="flex" alignItems="center">
@@ -276,21 +276,21 @@ const Leagues: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Box display="flex" gap={1} flexWrap="wrap">
-                      <Chip
-                        label={league.isMember ? 'Member' : 'Not a member'}
-                        color={league.isMember ? 'primary' : 'default'}
-                        size="small"
-                      />
-                      {league.isOwner && (
-                        <Chip label="Owner" color="secondary" size="small" />
-                      )}
-                    </Box>
+                    <Chip
+                      label={league.isMember ? 'Member' : 'Not a member'}
+                      color={league.isMember ? 'primary' : 'default'}
+                      size="small"
+                    />
+                    {league.isOwner && (
+                      <Chip label="Owner" color="secondary" size="small" />
+                    )}
+                  </Box>
                   </TableCell>
                   <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                     <Box display="flex" gap={1} justifyContent="flex-end">
                       <IconButton
-                        component={Link}
-                        to={`/leagues/${league._id}`}
+                    component={Link}
+                    to={`/leagues/${league._id}`}
                         size="small"
                         color="primary"
                       >
@@ -306,18 +306,18 @@ const Leagues: React.FC = () => {
                           >
                             <Edit />
                           </IconButton>
-                          <IconButton
+                      <IconButton
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDelete(league._id);
                             }}
-                            size="small"
-                            color="error"
-                          >
-                            <Delete />
-                          </IconButton>
-                        </>
-                      )}
+                        size="small"
+                        color="error"
+                      >
+                        <Delete />
+                      </IconButton>
+                    </>
+                  )}
                     </Box>
                   </TableCell>
                 </TableRow>

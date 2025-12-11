@@ -33,6 +33,7 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Alert,
 } from '@mui/material';
 import {
   Public,
@@ -45,8 +46,9 @@ import {
   Share,
   CheckCircle,
   RadioButtonUnchecked,
+  Mail,
 } from '@mui/icons-material';
-import { leaguesApi, seasonsApi, teamsApi, playersApi, gamesApi, venuesApi, authApi } from '../services/api';
+import { leaguesApi, seasonsApi, teamsApi, playersApi, gamesApi, venuesApi, authApi, invitationsApi } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import type { League, Season, Team, Player, CreateTeamData, CreatePlayerData, Game, PlayerRegistration } from '../types';
 
@@ -66,6 +68,13 @@ const LeagueDetail: React.FC = () => {
   const [showAddVenueDialog, setShowAddVenueDialog] = useState(false);
   const [showCreateVenueDialog, setShowCreateVenueDialog] = useState(false);
   const [showCreateSeasonDialog, setShowCreateSeasonDialog] = useState(false);
+  const [showInviteCoachesDialog, setShowInviteCoachesDialog] = useState(false);
+  const [inviteCoachEmails, setInviteCoachEmails] = useState<string[]>([]);
+  const [inviteCoachEmailInput, setInviteCoachEmailInput] = useState('');
+  const [invitingCoaches, setInvitingCoaches] = useState(false);
+  const [inviteCoachError, setInviteCoachError] = useState('');
+  const [inviteCoachSuccess, setInviteCoachSuccess] = useState(false);
+  const [inviteCoachResults, setInviteCoachResults] = useState<{ email: string; success: boolean; message?: string }[]>([]);
   const [selectedVenueForAdd, setSelectedVenueForAdd] = useState<any | null>(null);
   const [showSetVenueDialog, setShowSetVenueDialog] = useState(false);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
@@ -870,6 +879,15 @@ const LeagueDetail: React.FC = () => {
           </Box>
         </Box>
         <Box display="flex" gap={1}>
+          {league.isOwner && (
+            <Button
+              variant="outlined"
+              startIcon={<Mail />}
+              onClick={() => setShowInviteCoachesDialog(true)}
+            >
+              Invite Coaches
+            </Button>
+          )}
           {league.isOwner && seasons.length === 0 && (
             <Button
               variant="contained"
@@ -889,7 +907,7 @@ const LeagueDetail: React.FC = () => {
               Start League
             </Button>
           )}
-          {selectedSeason && selectedSeason.status === 'registration' && (league.isMember || league.isOwner) && (
+          {selectedSeason && selectedSeason.status === 'registration' && (
             <Button
               variant="contained"
               color="primary"
@@ -900,9 +918,9 @@ const LeagueDetail: React.FC = () => {
                 }
               }}
             >
-              Register
-                  </Button>
-                )}
+              {user?.userType === 'league_admin' ? 'Register Team' : 'Register Your Team'}
+            </Button>
+          )}
               </Box>
       </Box>
 
@@ -2733,13 +2751,18 @@ const LeagueDetail: React.FC = () => {
           Register for {selectedSeason?.name}
         </DialogTitle>
         <DialogContent>
+          {user?.userType === 'coach_player' && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              As a coach/player, you can register teams you coach or join teams as a player.
+            </Alert>
+          )}
           <Box sx={{ mb: 2 }}>
             <Button
               variant={registerMode === 'team' ? 'contained' : 'outlined'}
               onClick={() => setRegisterMode('team')}
               sx={{ mr: 1 }}
             >
-              Register Team
+              {user?.userType === 'coach_player' ? 'Register Your Team' : 'Register Team'}
             </Button>
             <Button
               variant={registerMode === 'player' ? 'contained' : 'outlined'}
@@ -2841,38 +2864,46 @@ const LeagueDetail: React.FC = () => {
                       margin="normal"
                     />
                   </Box>
-                  <Box mt={2}>
-                    <Autocomplete
-                      options={coachOptions}
-                      getOptionLabel={(option) => `${option.firstName} ${option.lastName} (${option.email})`}
-                      value={selectedCoach}
-                      onInputChange={(_, newValue) => {
-                        setCoachSearchQuery(newValue);
-                      }}
-                      onChange={(_, newValue) => {
-                        setSelectedCoach(newValue);
-                      }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Coach/Manager (Optional)"
-                          placeholder={user ? `Default: ${user.firstName} ${user.lastName} (you)` : 'Search users...'}
-                          helperText={!selectedCoach && user ? `Will default to ${user.firstName} ${user.lastName} if not specified` : ''}
-                          margin="normal"
-                        />
-                      )}
-                      renderOption={(props, option) => (
-                        <Box component="li" {...props} key={option._id}>
-                          <Box>
-                            <Typography variant="body1">{option.firstName} {option.lastName}</Typography>
-                            <Typography variant="body2" color="textSecondary">{option.email}</Typography>
+                  {user?.userType === 'league_admin' ? (
+                    <Box mt={2}>
+                      <Autocomplete
+                        options={coachOptions}
+                        getOptionLabel={(option) => `${option.firstName} ${option.lastName} (${option.email})`}
+                        value={selectedCoach}
+                        onInputChange={(_, newValue) => {
+                          setCoachSearchQuery(newValue);
+                        }}
+                        onChange={(_, newValue) => {
+                          setSelectedCoach(newValue);
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Coach/Manager (Optional)"
+                            placeholder={user ? `Default: ${user.firstName} ${user.lastName} (you)` : 'Search users...'}
+                            helperText={!selectedCoach && user ? `Will default to ${user.firstName} ${user.lastName} if not specified` : ''}
+                            margin="normal"
+                          />
+                        )}
+                        renderOption={(props, option) => (
+                          <Box component="li" {...props} key={option._id}>
+                            <Box>
+                              <Typography variant="body1">{option.firstName} {option.lastName}</Typography>
+                              <Typography variant="body2" color="textSecondary">{option.email}</Typography>
+                            </Box>
                           </Box>
-                        </Box>
-                      )}
-                      noOptionsText={coachSearchQuery.length < 2 ? 'Type at least 2 characters to search' : 'No users found'}
-                      loading={false}
-                    />
-                  </Box>
+                        )}
+                        noOptionsText={coachSearchQuery.length < 2 ? 'Type at least 2 characters to search' : 'No users found'}
+                        loading={false}
+                      />
+                    </Box>
+                  ) : (
+                    <Box mt={2}>
+                      <Alert severity="info">
+                        You will be automatically set as the coach/manager of this team.
+                      </Alert>
+                    </Box>
+                  )}
                   <Button
                     variant="outlined"
                     onClick={() => setShowCreateTeamForm(false)}
@@ -3041,6 +3072,178 @@ const LeagueDetail: React.FC = () => {
               Create Profile & Join Team
             </Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Invite Coaches Dialog */}
+      <Dialog 
+        open={showInviteCoachesDialog} 
+        onClose={() => {
+          setShowInviteCoachesDialog(false);
+          setInviteCoachEmails([]);
+          setInviteCoachEmailInput('');
+          setInviteCoachError('');
+          setInviteCoachSuccess(false);
+          setInviteCoachResults([]);
+        }} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>Invite Coaches to {league?.name}</DialogTitle>
+        <DialogContent>
+          {inviteCoachSuccess && inviteCoachResults.length > 0 && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {inviteCoachResults.filter(r => r.success).length} of {inviteCoachResults.length} invitation{inviteCoachResults.length > 1 ? 's' : ''} sent successfully!
+            </Alert>
+          )}
+          {inviteCoachError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {inviteCoachError}
+            </Alert>
+          )}
+          {inviteCoachResults.some(r => !r.success) && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Some invitations failed:
+              </Typography>
+              {inviteCoachResults.filter(r => !r.success).map((result, idx) => (
+                <Typography key={idx} variant="body2">
+                  {result.email}: {result.message}
+                </Typography>
+              ))}
+            </Alert>
+          )}
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Enter email addresses and press Enter to add them. Invited coaches can create a team for this league. If they already have an account, they'll see the invitation in their dashboard. If not, they'll see it when they sign up.
+          </Typography>
+          
+          {/* Email Chips */}
+          {inviteCoachEmails.length > 0 && (
+            <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {inviteCoachEmails.map((email) => (
+                <Chip
+                  key={email}
+                  label={email}
+                  onDelete={() => setInviteCoachEmails(inviteCoachEmails.filter(e => e !== email))}
+                  color="primary"
+                  variant="outlined"
+                />
+              ))}
+            </Box>
+          )}
+          
+          <TextField
+            fullWidth
+            label="Email Addresses"
+            type="email"
+            value={inviteCoachEmailInput}
+            onChange={(e) => {
+              setInviteCoachEmailInput(e.target.value);
+              setInviteCoachError('');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && inviteCoachEmailInput.trim()) {
+                e.preventDefault();
+                const email = inviteCoachEmailInput.trim().toLowerCase();
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                  setInviteCoachError('Please enter a valid email address');
+                  return;
+                }
+                if (inviteCoachEmails.includes(email)) {
+                  setInviteCoachError('This email has already been added');
+                  return;
+                }
+                setInviteCoachEmails([...inviteCoachEmails, email]);
+                setInviteCoachEmailInput('');
+                setInviteCoachError('');
+              }
+            }}
+            placeholder="Enter email and press Enter to add"
+            margin="normal"
+            disabled={invitingCoaches || inviteCoachSuccess}
+            helperText="Press Enter to add each email address"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setShowInviteCoachesDialog(false);
+              setInviteCoachEmails([]);
+              setInviteCoachEmailInput('');
+              setInviteCoachError('');
+              setInviteCoachSuccess(false);
+              setInviteCoachResults([]);
+            }}
+            disabled={invitingCoaches}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              if (inviteCoachEmails.length === 0) {
+                setInviteCoachError('Please add at least one email address');
+                return;
+              }
+
+              setInvitingCoaches(true);
+              setInviteCoachError('');
+              setInviteCoachSuccess(false);
+              setInviteCoachResults([]);
+
+              const results: { email: string; success: boolean; message?: string }[] = [];
+
+              try {
+                await Promise.allSettled(
+                  inviteCoachEmails.map(async (email) => {
+                    try {
+                      // Pass the selected season if available
+                      await invitationsApi.createLeagueInvitation(id!, email, selectedSeason?._id);
+                      results.push({ email, success: true });
+                    } catch (error: any) {
+                      const errorMessage = error.response?.data?.message || 
+                                         error.response?.data?.error || 
+                                         error.message || 
+                                         'Error sending invitation';
+                      console.error(`Error inviting ${email}:`, error);
+                      results.push({ 
+                        email, 
+                        success: false, 
+                        message: errorMessage
+                      });
+                    }
+                  })
+                );
+
+                setInviteCoachResults(results);
+                const successCount = results.filter(r => r.success).length;
+                
+                if (successCount > 0) {
+                  setInviteCoachSuccess(true);
+                  setInviteCoachEmails([]);
+                  
+                  if (successCount === inviteCoachEmails.length) {
+                    setTimeout(() => {
+                      setShowInviteCoachesDialog(false);
+                      setInviteCoachSuccess(false);
+                      setInviteCoachResults([]);
+                    }, 3000);
+                  }
+                } else {
+                  setInviteCoachError('Failed to send all invitations');
+                }
+              } catch (error: any) {
+                setInviteCoachError('Error sending invitations');
+              } finally {
+                setInvitingCoaches(false);
+              }
+            }}
+            variant="contained"
+            startIcon={<Mail />}
+            disabled={invitingCoaches || inviteCoachSuccess || inviteCoachEmails.length === 0}
+          >
+            {invitingCoaches ? `Sending ${inviteCoachEmails.length} invitation${inviteCoachEmails.length > 1 ? 's' : ''}...` : `Send ${inviteCoachEmails.length} Invitation${inviteCoachEmails.length > 1 ? 's' : ''}`}
+          </Button>
         </DialogActions>
       </Dialog>
 

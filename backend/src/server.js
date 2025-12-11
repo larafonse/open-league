@@ -29,6 +29,7 @@ app.use('/api/games', require('./routes/games'));
 app.use('/api/standings', require('./routes/standings'));
 app.use('/api/seasons', require('./routes/seasons'));
 app.use('/api/venues', require('./routes/venues'));
+app.use('/api/invitations', require('./routes/invitations'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

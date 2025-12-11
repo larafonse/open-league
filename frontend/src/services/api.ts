@@ -172,7 +172,29 @@ export interface LoginResponse {
   };
 }
 
-export interface SignupResponse extends LoginResponse {}
+export interface SignupResponse extends LoginResponse {
+  pendingInvitations?: Array<{
+    _id: string;
+    email: string;
+    team: {
+      _id: string;
+      name: string;
+      city: string;
+      colors: {
+        primary: string;
+        secondary: string;
+      };
+    };
+    invitedBy: {
+      _id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+    status: string;
+    createdAt: string;
+  }>;
+}
 
 export const authApi = {
   login: (email: string, password: string): Promise<LoginResponse> =>
@@ -191,6 +213,21 @@ export const authApi = {
   }> => api.get('/auth/me').then(res => res.data.user),
   searchUsers: (query: string): Promise<Array<{ _id: string; firstName: string; lastName: string; email: string }>> =>
     api.get('/auth/users/search', { params: { q: query } }).then(res => res.data),
+  checkInvitations: (email: string): Promise<Array<any>> =>
+    api.get(`/auth/check-invitations/${email}`).then(res => res.data),
+};
+
+export const invitationsApi = {
+  createTeamInvitation: (teamId: string, email: string): Promise<any> =>
+    api.post(`/invitations/teams/${teamId}`, { email }).then(res => res.data),
+  createLeagueInvitation: (leagueId: string, email: string, seasonId?: string): Promise<any> =>
+    api.post(`/invitations/leagues/${leagueId}`, { email, seasonId }).then(res => res.data),
+  getAll: (): Promise<Array<any>> =>
+    api.get('/invitations').then(res => res.data),
+  accept: (invitationId: string): Promise<any> =>
+    api.post(`/invitations/${invitationId}/accept`).then(res => res.data),
+  decline: (invitationId: string): Promise<any> =>
+    api.post(`/invitations/${invitationId}/decline`).then(res => res.data),
 };
 
 // Venues API

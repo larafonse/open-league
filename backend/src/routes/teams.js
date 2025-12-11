@@ -151,7 +151,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // POST /api/teams/:id/players - Add player to team
-router.post('/:id/players', [
+router.post('/:id/players', authenticate, [
   body('playerId').isMongoId().withMessage('Valid player ID is required')
 ], async (req, res) => {
   try {
@@ -164,6 +164,15 @@ router.post('/:id/players', [
     if (!team) {
       return res.status(404).json({ message: 'Team not found' });
     }
+
+    // For coach/player users, verify they are the coach of the team
+    if (req.user.userType === 'coach_player') {
+      const teamCoachId = team.coach ? (typeof team.coach === 'object' ? team.coach._id.toString() : team.coach.toString()) : null;
+      if (teamCoachId !== req.user._id.toString()) {
+        return res.status(403).json({ message: 'You can only add players to teams that you coach' });
+      }
+    }
+    // League admins can add players to any team
 
     const player = await Player.findById(req.body.playerId);
     if (!player) {
