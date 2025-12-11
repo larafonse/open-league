@@ -16,7 +16,9 @@ router.post('/signup', [
   body('email').isEmail().withMessage('Valid email is required'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
   body('firstName').notEmpty().withMessage('First name is required'),
-  body('lastName').notEmpty().withMessage('Last name is required')
+  body('lastName').notEmpty().withMessage('Last name is required'),
+  body('userType').isIn(['league_admin', 'coach_player']).withMessage('User type must be league_admin or coach_player'),
+  body('tier').optional().isInt({ min: 1, max: 3 }).withMessage('Tier must be 1, 2, or 3')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -24,7 +26,7 @@ router.post('/signup', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { email, password, firstName, lastName } = req.body;
+    const { email, password, firstName, lastName, userType, tier } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -32,12 +34,27 @@ router.post('/signup', [
       return res.status(400).json({ message: 'User with this email already exists' });
     }
 
+    // Validate tier for league_admin
+    let finalTier = tier || 1;
+    if (userType === 'league_admin') {
+      // League admins must have a tier
+      if (!tier || tier < 1 || tier > 3) {
+        return res.status(400).json({ message: 'League admins must have a tier (1, 2, or 3)' });
+      }
+      finalTier = tier;
+    } else {
+      // Coach/player users default to tier 1 (but it doesn't matter for them)
+      finalTier = 1;
+    }
+
     // Create new user
     const user = new User({
       email,
       password,
       firstName,
-      lastName
+      lastName,
+      userType: userType || 'coach_player',
+      tier: finalTier
     });
 
     await user.save();
@@ -53,7 +70,10 @@ router.post('/signup', [
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        role: user.role
+        role: user.role,
+        userType: user.userType,
+        tier: user.tier,
+        leagueLimit: user.leagueLimit
       }
     });
   } catch (error) {
@@ -98,7 +118,10 @@ router.post('/login', [
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        role: user.role
+        role: user.role,
+        userType: user.userType,
+        tier: user.tier,
+        leagueLimit: user.leagueLimit
       }
     });
   } catch (error) {
@@ -130,7 +153,10 @@ router.get('/me', async (req, res) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        role: user.role
+        role: user.role,
+        userType: user.userType,
+        tier: user.tier,
+        leagueLimit: user.leagueLimit
       }
     });
   } catch (error) {
@@ -138,6 +164,33 @@ router.get('/me', async (req, res) => {
       return res.status(401).json({ message: 'Invalid or expired token' });
     }
     res.status(500).json({ message: 'Error fetching user', error: error.message });
+  }
+});
+
+// GET /api/auth/users/search - Search users (for manager assignment)
+router.get('/users/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q || q.length < 2) {
+      return res.json([]);
+    }
+
+    const searchRegex = new RegExp(q, 'i');
+    const users = await User.find({
+      $or: [
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+        { email: searchRegex }
+      ]
+    })
+      .select('firstName lastName email')
+      .limit(20)
+      .sort({ firstName: 1, lastName: 1 });
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Error searching users', error: error.message });
   }
 });
 

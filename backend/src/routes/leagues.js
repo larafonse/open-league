@@ -3,6 +3,7 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const League = require('../models/League');
 const Season = require('../models/Season');
+const User = require('../models/User');
 const authenticate = require('../middleware/auth');
 
 // GET /api/leagues - Get all leagues (with search)
@@ -104,6 +105,28 @@ router.post('/', authenticate, [
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
+    }
+
+    // Check if user is a league admin
+    if (req.user.userType !== 'league_admin') {
+      return res.status(403).json({ message: 'Only league admins can create leagues' });
+    }
+
+    // Check tier limit
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Count existing leagues owned by this user
+    const existingLeaguesCount = await League.countDocuments({ owner: req.user._id });
+    
+    // Check if user has reached their tier limit
+    if (user.leagueLimit !== Infinity && existingLeaguesCount >= user.leagueLimit) {
+      const tierName = user.tier === 1 ? 'Tier 1' : user.tier === 2 ? 'Tier 2' : 'Tier 3';
+      return res.status(403).json({ 
+        message: `You have reached your league limit (${user.leagueLimit} league${user.leagueLimit > 1 ? 's' : ''} for ${tierName}). Please upgrade your tier to create more leagues.` 
+      });
     }
 
     const league = new League({

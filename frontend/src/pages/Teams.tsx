@@ -20,6 +20,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Autocomplete,
 } from '@mui/material';
 import {
   Add,
@@ -28,11 +29,13 @@ import {
   Edit,
   Delete,
 } from '@mui/icons-material';
-import { teamsApi } from '../services/api';
+import { teamsApi, authApi } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 import type { Team } from '../types';
 
 const Teams: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -46,6 +49,29 @@ const Teams: React.FC = () => {
     founded: '',
     coach: ''
   });
+  const [coachSearchQuery, setCoachSearchQuery] = useState('');
+  const [coachOptions, setCoachOptions] = useState<Array<{ _id: string; firstName: string; lastName: string; email: string }>>([]);
+  const [selectedCoach, setSelectedCoach] = useState<{ _id: string; firstName: string; lastName: string; email: string } | null>(null);
+
+  // Search for users when coach search query changes
+  useEffect(() => {
+    const searchUsers = async () => {
+      if (coachSearchQuery.length >= 2) {
+        try {
+          const users = await authApi.searchUsers(coachSearchQuery);
+          setCoachOptions(users);
+        } catch (error) {
+          console.error('Error searching users:', error);
+          setCoachOptions([]);
+        }
+      } else {
+        setCoachOptions([]);
+      }
+    };
+
+    const debounceTimer = setTimeout(searchUsers, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [coachSearchQuery]);
 
   useEffect(() => {
     fetchData();
@@ -67,7 +93,8 @@ const Teams: React.FC = () => {
     try {
       const teamData = {
         ...formData,
-        founded: formData.founded ? parseInt(formData.founded) : undefined
+        founded: formData.founded ? parseInt(formData.founded) : undefined,
+        coach: selectedCoach?._id || undefined
       };
       await teamsApi.create(teamData);
       setShowCreateForm(false);
@@ -81,6 +108,9 @@ const Teams: React.FC = () => {
         founded: '',
         coach: ''
       });
+      setSelectedCoach(null);
+      setCoachSearchQuery('');
+      setCoachOptions([]);
       fetchData();
     } catch (error) {
       console.error('Error creating team:', error);
@@ -164,11 +194,39 @@ const Teams: React.FC = () => {
                 />
               </Box>
               <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
-                <TextField
-                  fullWidth
-                  label="Coach"
-                  value={formData.coach}
-                  onChange={(e) => setFormData({ ...formData, coach: e.target.value })}
+                <Autocomplete
+                  options={coachOptions}
+                  getOptionLabel={(option) => `${option.firstName} ${option.lastName} (${option.email})`}
+                  value={selectedCoach}
+                  onInputChange={(_, newValue) => {
+                    setCoachSearchQuery(newValue);
+                  }}
+                  onChange={(_, newValue) => {
+                    setSelectedCoach(newValue);
+                    if (newValue) {
+                      setFormData({ ...formData, coach: newValue._id });
+                    } else {
+                      setFormData({ ...formData, coach: '' });
+                    }
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Coach/Manager"
+                      placeholder={user ? `Default: ${user.firstName} ${user.lastName} (you)` : 'Search users...'}
+                      helperText={!selectedCoach && user ? `Will default to ${user.firstName} ${user.lastName} if not specified` : ''}
+                    />
+                  )}
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props} key={option._id}>
+                      <Box>
+                        <Typography variant="body1">{option.firstName} {option.lastName}</Typography>
+                        <Typography variant="body2" color="textSecondary">{option.email}</Typography>
+                      </Box>
+                    </Box>
+                  )}
+                  noOptionsText={coachSearchQuery.length < 2 ? 'Type at least 2 characters to search' : 'No users found'}
+                  loading={false}
                 />
               </Box>
               <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
@@ -261,7 +319,11 @@ const Teams: React.FC = () => {
                       {team.city}
                     </Box>
                   </TableCell>
-                  <TableCell>{team.coach || '-'}</TableCell>
+                  <TableCell>
+                    {team.coach && typeof team.coach === 'object' 
+                      ? `${team.coach.firstName} ${team.coach.lastName}`
+                      : team.coach || '-'}
+                  </TableCell>
                   <TableCell>{team.founded || '-'}</TableCell>
                   <TableCell>
                     <Typography variant="body2" fontWeight="medium">

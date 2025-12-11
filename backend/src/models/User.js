@@ -29,6 +29,16 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['user', 'admin'],
     default: 'user'
+  },
+  userType: {
+    type: String,
+    enum: ['league_admin', 'coach_player'],
+    default: 'coach_player'
+  },
+  tier: {
+    type: Number,
+    enum: [1, 2, 3],
+    default: 1
   }
 }, {
   timestamps: true
@@ -54,12 +64,25 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
+// Virtual for league limit based on tier
+userSchema.virtual('leagueLimit').get(function() {
+  if (this.userType !== 'league_admin') return 0;
+  switch (this.tier) {
+    case 1: return 1;
+    case 2: return 3;
+    case 3: return Infinity; // Unlimited
+    default: return 0;
+  }
+});
+
 // Remove password from JSON output
 userSchema.methods.toJSON = function() {
-  const user = this.toObject();
+  const user = this.toObject({ virtuals: true });
   delete user.password;
   return user;
 };
+
+userSchema.set('toJSON', { virtuals: true });
 
 module.exports = mongoose.model('User', userSchema);
 

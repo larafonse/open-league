@@ -71,7 +71,7 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Navigate to="/dashboard" replace />
+                    <Navigate to="/leagues" replace />
                   </Layout>
                 </ProtectedRoute>
               }

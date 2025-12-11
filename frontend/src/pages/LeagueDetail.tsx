@@ -43,10 +43,12 @@ import {
   HowToReg,
   PlayArrow,
   Share,
+  CheckCircle,
+  RadioButtonUnchecked,
 } from '@mui/icons-material';
-import { leaguesApi, seasonsApi, teamsApi, playersApi, gamesApi, venuesApi } from '../services/api';
+import { leaguesApi, seasonsApi, teamsApi, playersApi, gamesApi, venuesApi, authApi } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-import type { League, Season, Team, Player, CreateTeamData, CreatePlayerData, Game } from '../types';
+import type { League, Season, Team, Player, CreateTeamData, CreatePlayerData, Game, PlayerRegistration } from '../types';
 
 const LeagueDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -117,6 +119,10 @@ const LeagueDetail: React.FC = () => {
   const [registeredTeams, setRegisteredTeams] = useState<Team[]>([]);
   const [registerMode, setRegisterMode] = useState<'team' | 'player'>('team');
   const [selectedTeam, setSelectedTeam] = useState<string>('');
+  const [playerRegistrations, setPlayerRegistrations] = useState<PlayerRegistration[]>([]);
+  const [showPlayerRegistrationDialog, setShowPlayerRegistrationDialog] = useState(false);
+  const [selectedTeamForRegistration, setSelectedTeamForRegistration] = useState<Team | null>(null);
+  const [selectedPlayerForRegistration, setSelectedPlayerForRegistration] = useState<Player | null>(null);
   const [showCreateTeamForm, setShowCreateTeamForm] = useState(false);
   const [showCreatePlayerForm, setShowCreatePlayerForm] = useState(false);
   const [userPlayer, setUserPlayer] = useState<Player | null>(null);
@@ -126,6 +132,10 @@ const LeagueDetail: React.FC = () => {
     description: '',
     isPublic: true,
   });
+  const [coachSearchQuery, setCoachSearchQuery] = useState('');
+  const [coachOptions, setCoachOptions] = useState<Array<{ _id: string; firstName: string; lastName: string; email: string }>>([]);
+  const [selectedCoach, setSelectedCoach] = useState<{ _id: string; firstName: string; lastName: string; email: string } | null>(null);
+  
   const [newTeamData, setNewTeamData] = useState<CreateTeamData>({
     name: '',
     city: '',
@@ -171,10 +181,23 @@ const LeagueDetail: React.FC = () => {
       fetchGames();
       fetchVenues();
       fetchStatistics();
+      fetchPlayerRegistrations();
     } else {
       setStatistics(null);
+      setPlayerRegistrations([]);
     }
   }, [selectedSeason, id]);
+
+  const fetchPlayerRegistrations = async () => {
+    if (!selectedSeason) return;
+    try {
+      const registrations = await seasonsApi.getPlayerRegistrations(selectedSeason._id);
+      setPlayerRegistrations(registrations);
+    } catch (error) {
+      console.error('Error fetching player registrations:', error);
+      setPlayerRegistrations([]);
+    }
+  };
 
   // Fetch statistics for active season when on overview tab
   useEffect(() => {
@@ -213,6 +236,26 @@ const LeagueDetail: React.FC = () => {
       setLoadingStatistics(false);
     }
   };
+
+  // Search for users when coach search query changes
+  useEffect(() => {
+    const searchUsers = async () => {
+      if (coachSearchQuery.length >= 2) {
+        try {
+          const users = await authApi.searchUsers(coachSearchQuery);
+          setCoachOptions(users);
+        } catch (error) {
+          console.error('Error searching users:', error);
+          setCoachOptions([]);
+        }
+      } else {
+        setCoachOptions([]);
+      }
+    };
+
+    const debounceTimer = setTimeout(searchUsers, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [coachSearchQuery]);
 
   // Check for hat-trick when game is selected
   useEffect(() => {
@@ -652,8 +695,12 @@ const LeagueDetail: React.FC = () => {
     if (!selectedSeason) return;
     
     try {
-      // Create team
-      const newTeam = await teamsApi.create(newTeamData);
+      // Create team with coach
+      const teamData = {
+        ...newTeamData,
+        coach: selectedCoach?._id || undefined
+      };
+      const newTeam = await teamsApi.create(teamData);
       
       // Register team to season
       await seasonsApi.registerTeam(selectedSeason._id, newTeam._id);
@@ -670,6 +717,9 @@ const LeagueDetail: React.FC = () => {
           secondary: '#FFFFFF',
         },
       });
+      setSelectedCoach(null);
+      setCoachSearchQuery('');
+      setCoachOptions([]);
     } catch (error: any) {
       console.error('Error creating team:', error);
       alert(error.response?.data?.message || 'Error creating team. Please try again.');
@@ -1117,6 +1167,125 @@ const LeagueDetail: React.FC = () => {
                   </TableBody>
                 </Table>
               </TableContainer>
+            )}
+
+            {/* Player Registrations Section */}
+            {selectedSeason && teams.length > 0 && (
+              <Box mt={3}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Typography variant="h6">
+                    Player Registrations & Payment Status
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<Add />}
+                    onClick={() => setShowPlayerRegistrationDialog(true)}
+                  >
+                    Register Player
+                  </Button>
+                </Box>
+                
+                {playerRegistrations.length === 0 ? (
+                  <Paper sx={{ p: 3, textAlign: 'center' }}>
+                    <Typography variant="body2" color="textSecondary">
+                      No player registrations yet. Register players to track their registration fees.
+                    </Typography>
+                  </Paper>
+                ) : (
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Player</TableCell>
+                          <TableCell>Team</TableCell>
+                          <TableCell>Position</TableCell>
+                          <TableCell>Jersey #</TableCell>
+                          <TableCell>Payment Status</TableCell>
+                          <TableCell>Payment Date</TableCell>
+                          <TableCell align="right">Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {playerRegistrations.map((registration) => {
+                          const player = typeof registration.player === 'object' ? registration.player : null;
+                          const team = typeof registration.team === 'object' ? registration.team : null;
+                          if (!player || !team) return null;
+                          
+                          return (
+                            <TableRow key={`${registration.player}_${registration.team}`} hover>
+                              <TableCell>
+                                <Box display="flex" alignItems="center" gap={1}>
+                                  <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
+                                    {player.firstName?.[0]}{player.lastName?.[0]}
+                                  </Avatar>
+                                  <Typography variant="body2">
+                                    {player.firstName} {player.lastName}
+                                  </Typography>
+                                </Box>
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2">{team.name}</Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Chip label={player.position} size="small" color="primary" />
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2">
+                                  {player.jerseyNumber ? `#${player.jerseyNumber}` : '-'}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  label={registration.hasPaid ? 'Paid' : 'Unpaid'}
+                                  size="small"
+                                  color={registration.hasPaid ? 'success' : 'error'}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2" color="textSecondary">
+                                  {registration.paymentDate
+                                    ? new Date(registration.paymentDate).toLocaleDateString()
+                                    : '-'}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="right">
+                                <IconButton
+                                  size="small"
+                                  onClick={async () => {
+                                    const playerId = typeof registration.player === 'object' 
+                                      ? registration.player._id 
+                                      : registration.player;
+                                    const teamId = typeof registration.team === 'object' 
+                                      ? registration.team._id 
+                                      : registration.team;
+                                    try {
+                                      await seasonsApi.updatePlayerRegistration(
+                                        selectedSeason._id,
+                                        playerId,
+                                        teamId,
+                                        !registration.hasPaid
+                                      );
+                                      await fetchPlayerRegistrations();
+                                    } catch (error) {
+                                      console.error('Error updating payment status:', error);
+                                      alert('Error updating payment status');
+                                    }
+                                  }}
+                                  color={registration.hasPaid ? 'default' : 'success'}
+                                  title={registration.hasPaid ? 'Mark as Unpaid' : 'Mark as Paid'}
+                                >
+                                  {registration.hasPaid ? <CheckCircle /> : <RadioButtonUnchecked />}
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
             )}
           </CardContent>
         </Card>
@@ -2672,6 +2841,38 @@ const LeagueDetail: React.FC = () => {
                       margin="normal"
                     />
                   </Box>
+                  <Box mt={2}>
+                    <Autocomplete
+                      options={coachOptions}
+                      getOptionLabel={(option) => `${option.firstName} ${option.lastName} (${option.email})`}
+                      value={selectedCoach}
+                      onInputChange={(_, newValue) => {
+                        setCoachSearchQuery(newValue);
+                      }}
+                      onChange={(_, newValue) => {
+                        setSelectedCoach(newValue);
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Coach/Manager (Optional)"
+                          placeholder={user ? `Default: ${user.firstName} ${user.lastName} (you)` : 'Search users...'}
+                          helperText={!selectedCoach && user ? `Will default to ${user.firstName} ${user.lastName} if not specified` : ''}
+                          margin="normal"
+                        />
+                      )}
+                      renderOption={(props, option) => (
+                        <Box component="li" {...props} key={option._id}>
+                          <Box>
+                            <Typography variant="body1">{option.firstName} {option.lastName}</Typography>
+                            <Typography variant="body2" color="textSecondary">{option.email}</Typography>
+                          </Box>
+                        </Box>
+                      )}
+                      noOptionsText={coachSearchQuery.length < 2 ? 'Type at least 2 characters to search' : 'No users found'}
+                      loading={false}
+                    />
+                  </Box>
                   <Button
                     variant="outlined"
                     onClick={() => setShowCreateTeamForm(false)}
@@ -2840,6 +3041,110 @@ const LeagueDetail: React.FC = () => {
               Create Profile & Join Team
             </Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Register Player Dialog */}
+      <Dialog 
+        open={showPlayerRegistrationDialog} 
+        onClose={() => {
+          setShowPlayerRegistrationDialog(false);
+          setSelectedTeamForRegistration(null);
+          setSelectedPlayerForRegistration(null);
+        }} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>Register Player for Season</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Select Team</InputLabel>
+              <Select
+                value={selectedTeamForRegistration?._id || ''}
+                label="Select Team"
+                onChange={(e) => {
+                  const team = teams.find(t => t._id === e.target.value);
+                  setSelectedTeamForRegistration(team || null);
+                  setSelectedPlayerForRegistration(null);
+                }}
+              >
+                {teams.map((team) => (
+                  <MenuItem key={team._id} value={team._id}>
+                    {team.name} - {team.city}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            {selectedTeamForRegistration && (
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Select Player</InputLabel>
+                <Select
+                  value={selectedPlayerForRegistration?._id || ''}
+                  label="Select Player"
+                  onChange={(e) => {
+                    const player = (selectedTeamForRegistration.players || []).find(
+                      (p: Player) => p._id === e.target.value
+                    );
+                    setSelectedPlayerForRegistration(player || null);
+                  }}
+                >
+                  {(selectedTeamForRegistration.players || []).map((player: Player) => {
+                    // Check if player is already registered
+                    const isRegistered = playerRegistrations.some(
+                      reg => {
+                        const regPlayerId = typeof reg.player === 'object' ? reg.player._id : reg.player;
+                        const regTeamId = typeof reg.team === 'object' ? reg.team._id : reg.team;
+                        return regPlayerId === player._id && regTeamId === selectedTeamForRegistration._id;
+                      }
+                    );
+                    return (
+                      <MenuItem 
+                        key={player._id} 
+                        value={player._id}
+                        disabled={isRegistered}
+                      >
+                        {player.firstName} {player.lastName} {isRegistered ? '(Already Registered)' : ''}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              </FormControl>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setShowPlayerRegistrationDialog(false);
+            setSelectedTeamForRegistration(null);
+            setSelectedPlayerForRegistration(null);
+          }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={async () => {
+              if (!selectedTeamForRegistration || !selectedPlayerForRegistration || !selectedSeason) return;
+              try {
+                await seasonsApi.registerPlayer(
+                  selectedSeason._id,
+                  selectedPlayerForRegistration._id,
+                  selectedTeamForRegistration._id
+                );
+                await fetchPlayerRegistrations();
+                setShowPlayerRegistrationDialog(false);
+                setSelectedTeamForRegistration(null);
+                setSelectedPlayerForRegistration(null);
+              } catch (error) {
+                console.error('Error registering player:', error);
+                alert('Error registering player. Please try again.');
+              }
+            }}
+            disabled={!selectedTeamForRegistration || !selectedPlayerForRegistration}
+          >
+            Register Player
+          </Button>
         </DialogActions>
       </Dialog>
 

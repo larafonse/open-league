@@ -7,13 +7,16 @@ interface User {
   firstName: string;
   lastName: string;
   role: string;
+  userType?: 'league_admin' | 'coach_player';
+  tier?: number;
+  leagueLimit?: number;
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
+  signup: (email: string, password: string, firstName: string, lastName: string, userType?: 'league_admin' | 'coach_player', tier?: number) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -66,8 +69,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.setItem('token', response.token);
   };
 
-  const signup = async (email: string, password: string, firstName: string, lastName: string) => {
-    const response = await authApi.signup(email, password, firstName, lastName);
+  const signup = async (email: string, password: string, firstName: string, lastName: string, userType?: 'league_admin' | 'coach_player', tier?: number) => {
+    const response = await authApi.signup(email, password, firstName, lastName, userType, tier);
     setToken(response.token);
     setUser(response.user);
     localStorage.setItem('token', response.token);

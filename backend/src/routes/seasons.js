@@ -331,6 +331,8 @@ router.get('/:id', authenticate, async (req, res) => {
       .populate('league', 'name owner members')
       .populate('teams', 'name city colors')
       .populate('standings.team', 'name city colors')
+      .populate('playerRegistrations.player', 'firstName lastName email jerseyNumber position')
+      .populate('playerRegistrations.team', 'name city colors')
       .populate({
         path: 'weeks.games',
         populate: {
@@ -901,6 +903,210 @@ router.delete('/:id/venues/:venueId', authenticate, async (req, res) => {
     res.json({ message: 'Venue removed from season successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Error removing venue from season', error: error.message });
+  }
+});
+
+// GET /api/seasons/:id/player-registrations - Get all player registrations for a season
+router.get('/:id/player-registrations', authenticate, async (req, res) => {
+  try {
+    const season = await Season.findById(req.params.id)
+      .populate('playerRegistrations.player', 'firstName lastName email jerseyNumber position')
+      .populate('playerRegistrations.team', 'name city colors');
+    
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user has access to the league
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isPublic && !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to view player registrations' });
+    }
+
+    res.json(season.playerRegistrations || []);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching player registrations', error: error.message });
+  }
+});
+
+// POST /api/seasons/:id/register-player - Register a player for a season
+router.post('/:id/register-player', authenticate, [
+  body('playerId').isMongoId().withMessage('Valid player ID is required'),
+  body('teamId').isMongoId().withMessage('Valid team ID is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const season = await Season.findById(req.params.id);
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user has access to the league
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isPublic && !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to register players' });
+    }
+
+    const { playerId, teamId } = req.body;
+
+    // Verify player and team exist
+    const player = await Player.findById(playerId);
+    if (!player) {
+      return res.status(404).json({ message: 'Player not found' });
+    }
+
+    const team = await Team.findById(teamId);
+    if (!team) {
+      return res.status(404).json({ message: 'Team not found' });
+    }
+
+    // Verify team is registered for this season
+    const teamIds = (season.teams || []).map((t) => {
+      if (typeof t === 'string') return t;
+      if (t && t.toString) return t.toString();
+      if (t && t._id) return t._id.toString();
+      return t;
+    });
+    if (!teamIds.includes(teamId)) {
+      return res.status(400).json({ message: 'Team is not registered for this season' });
+    }
+
+    // Check if player is already registered
+    const existingRegistration = (season.playerRegistrations || []).find(
+      reg => reg.player.toString() === playerId && reg.team.toString() === teamId
+    );
+    if (existingRegistration) {
+      return res.status(400).json({ message: 'Player is already registered for this season with this team' });
+    }
+
+    // Add player registration
+    season.playerRegistrations = season.playerRegistrations || [];
+    season.playerRegistrations.push({
+      player: playerId,
+      team: teamId,
+      hasPaid: false,
+      registrationDate: new Date()
+    });
+    await season.save();
+
+    const populatedSeason = await Season.findById(season._id)
+      .populate('playerRegistrations.player', 'firstName lastName email jerseyNumber position')
+      .populate('playerRegistrations.team', 'name city colors');
+
+    const newRegistration = populatedSeason.playerRegistrations[populatedSeason.playerRegistrations.length - 1];
+    res.status(201).json(newRegistration);
+  } catch (error) {
+    res.status(500).json({ message: 'Error registering player', error: error.message });
+  }
+});
+
+// PUT /api/seasons/:id/player-registrations/:playerId - Update player registration payment status
+router.put('/:id/player-registrations/:playerId', authenticate, [
+  body('hasPaid').isBoolean().withMessage('hasPaid must be a boolean'),
+  body('teamId').isMongoId().withMessage('Valid team ID is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const season = await Season.findById(req.params.id);
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user has access to the league
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isPublic && !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to update player registrations' });
+    }
+
+    const { playerId } = req.params;
+    const { teamId, hasPaid, notes } = req.body;
+
+    // Find the registration
+    const registration = (season.playerRegistrations || []).find(
+      reg => reg.player.toString() === playerId && reg.team.toString() === teamId
+    );
+    if (!registration) {
+      return res.status(404).json({ message: 'Player registration not found' });
+    }
+
+    // Update payment status
+    registration.hasPaid = hasPaid;
+    if (hasPaid && !registration.paymentDate) {
+      registration.paymentDate = new Date();
+    } else if (!hasPaid) {
+      registration.paymentDate = undefined;
+    }
+    if (notes !== undefined) {
+      registration.notes = notes;
+    }
+    await season.save();
+
+    const populatedSeason = await Season.findById(season._id)
+      .populate('playerRegistrations.player', 'firstName lastName email jerseyNumber position')
+      .populate('playerRegistrations.team', 'name city colors');
+
+    const updatedRegistration = populatedSeason.playerRegistrations.find(
+      reg => reg.player._id.toString() === playerId && reg.team._id.toString() === teamId
+    );
+    res.json(updatedRegistration);
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating player registration', error: error.message });
+  }
+});
+
+// DELETE /api/seasons/:id/player-registrations/:playerId - Remove player registration
+router.delete('/:id/player-registrations/:playerId', authenticate, [
+  body('teamId').isMongoId().withMessage('Valid team ID is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const season = await Season.findById(req.params.id);
+    if (!season) {
+      return res.status(404).json({ message: 'Season not found' });
+    }
+
+    // Check if user has access to the league
+    const league = await League.findById(season.league);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    if (!league.isPublic && !league.isMember(req.user._id)) {
+      return res.status(403).json({ message: 'You must be a member of this league to remove player registrations' });
+    }
+
+    const { playerId } = req.params;
+    const { teamId } = req.body;
+
+    // Remove the registration
+    season.playerRegistrations = (season.playerRegistrations || []).filter(
+      reg => !(reg.player.toString() === playerId && reg.team.toString() === teamId)
+    );
+    await season.save();
+
+    res.json({ message: 'Player registration removed successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error removing player registration', error: error.message });
   }
 });
 

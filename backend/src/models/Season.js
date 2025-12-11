@@ -111,6 +111,33 @@ const seasonSchema = new mongoose.Schema({
       type: Number,
       default: 0
     }
+  }],
+  playerRegistrations: [{
+    player: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Player',
+      required: true
+    },
+    team: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Team',
+      required: true
+    },
+    hasPaid: {
+      type: Boolean,
+      default: false
+    },
+    paymentDate: {
+      type: Date
+    },
+    registrationDate: {
+      type: Date,
+      default: Date.now
+    },
+    notes: {
+      type: String,
+      trim: true
+    }
   }]
 }, {
   timestamps: true

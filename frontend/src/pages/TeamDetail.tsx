@@ -33,6 +33,7 @@ import {
 } from '@mui/icons-material';
 import { teamsApi, playersApi } from '../services/api';
 import type { Team, Player } from '../types';
+import SoccerPitch from '../components/SoccerPitch';
 
 const TeamDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -162,10 +163,12 @@ const TeamDetail: React.FC = () => {
               {team.coach && (
                 <Box>
                   <Typography variant="body2" color="textSecondary">
-                    Coach
+                    Coach/Manager
                   </Typography>
                   <Typography variant="body1" sx={{ mb: 2 }}>
-                    {team.coach}
+                    {typeof team.coach === 'object' 
+                      ? `${team.coach.firstName} ${team.coach.lastName} (${team.coach.email})`
+                      : team.coach}
                   </Typography>
                 </Box>
               )}
@@ -340,6 +343,28 @@ const TeamDetail: React.FC = () => {
                   {players.length === 1 ? 'Player' : 'Players'}
                 </Typography>
               </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Soccer Pitch with Starting Lineup */}
+        <Grid size={{ xs: 12 }}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Starting Lineup
+              </Typography>
+              <Divider sx={{ my: 2 }} />
+              {players.length > 0 ? (
+                <SoccerPitch players={players} teamColors={team.colors} />
+              ) : (
+                <Box textAlign="center" py={4}>
+                  <People sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                  <Typography variant="body1" color="textSecondary">
+                    No players available for lineup.
+                  </Typography>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>

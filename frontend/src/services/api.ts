@@ -147,6 +147,14 @@ export const seasonsApi = {
     api.get(`/seasons/${id}/standings`).then(res => res.data),
   getStatistics: (id: string): Promise<{ topScorers: any[]; standings: any[] }> => 
     api.get(`/seasons/${id}/statistics`).then(res => res.data),
+  getPlayerRegistrations: (id: string): Promise<any[]> => 
+    api.get(`/seasons/${id}/player-registrations`).then(res => res.data),
+  registerPlayer: (id: string, playerId: string, teamId: string): Promise<any> => 
+    api.post(`/seasons/${id}/register-player`, { playerId, teamId }).then(res => res.data),
+  updatePlayerRegistration: (id: string, playerId: string, teamId: string, hasPaid: boolean, notes?: string): Promise<any> => 
+    api.put(`/seasons/${id}/player-registrations/${playerId}`, { teamId, hasPaid, notes }).then(res => res.data),
+  removePlayerRegistration: (id: string, playerId: string, teamId: string): Promise<void> => 
+    api.delete(`/seasons/${id}/player-registrations/${playerId}`, { data: { teamId } }).then(() => undefined),
 };
 
 // Auth API
@@ -158,6 +166,9 @@ export interface LoginResponse {
     firstName: string;
     lastName: string;
     role: string;
+    userType?: 'league_admin' | 'coach_player';
+    tier?: number;
+    leagueLimit?: number;
   };
 }
 
@@ -166,15 +177,20 @@ export interface SignupResponse extends LoginResponse {}
 export const authApi = {
   login: (email: string, password: string): Promise<LoginResponse> =>
     api.post('/auth/login', { email, password }).then(res => res.data),
-  signup: (email: string, password: string, firstName: string, lastName: string): Promise<SignupResponse> =>
-    api.post('/auth/signup', { email, password, firstName, lastName }).then(res => res.data),
+  signup: (email: string, password: string, firstName: string, lastName: string, userType?: 'league_admin' | 'coach_player', tier?: number): Promise<SignupResponse> =>
+    api.post('/auth/signup', { email, password, firstName, lastName, userType, tier }).then(res => res.data),
   getCurrentUser: (): Promise<{
     _id: string;
     email: string;
     firstName: string;
     lastName: string;
     role: string;
+    userType?: 'league_admin' | 'coach_player';
+    tier?: number;
+    leagueLimit?: number;
   }> => api.get('/auth/me').then(res => res.data.user),
+  searchUsers: (query: string): Promise<Array<{ _id: string; firstName: string; lastName: string; email: string }>> =>
+    api.get('/auth/users/search', { params: { q: query } }).then(res => res.data),
 };
 
 // Venues API

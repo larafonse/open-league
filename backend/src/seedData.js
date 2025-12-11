@@ -15,77 +15,67 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/arch-suit
   useUnifiedTopology: true,
 });
 
-// Sample data
+// Sample data - coach will be assigned from users array
 const teamData = [
   {
     name: 'Thunder Bolts',
     city: 'Seattle',
     colors: { primary: '#1E3A8A', secondary: '#F59E0B' },
-    founded: 1995,
-    coach: 'Mike Johnson'
+    founded: 1995
   },
   {
     name: 'Fire Hawks',
     city: 'Phoenix',
     colors: { primary: '#DC2626', secondary: '#F97316' },
-    founded: 1988,
-    coach: 'Sarah Williams'
+    founded: 1988
   },
   {
     name: 'Storm Riders',
     city: 'Miami',
     colors: { primary: '#059669', secondary: '#0EA5E9' },
-    founded: 2001,
-    coach: 'Carlos Rodriguez'
+    founded: 2001
   },
   {
     name: 'Iron Wolves',
     city: 'Chicago',
     colors: { primary: '#374151', secondary: '#F3F4F6' },
-    founded: 1992,
-    coach: 'David Chen'
+    founded: 1992
   },
   {
     name: 'Golden Eagles',
     city: 'Denver',
     colors: { primary: '#FCD34D', secondary: '#1F2937' },
-    founded: 1998,
-    coach: 'Robert Martinez'
+    founded: 1998
   },
   {
     name: 'Blue Sharks',
     city: 'San Diego',
     colors: { primary: '#0EA5E9', secondary: '#FFFFFF' },
-    founded: 2003,
-    coach: 'Jennifer Adams'
+    founded: 2003
   },
   {
     name: 'Crimson Lions',
     city: 'Boston',
     colors: { primary: '#B91C1C', secondary: '#FEF3C7' },
-    founded: 1985,
-    coach: 'Thomas Wright'
+    founded: 1985
   },
   {
     name: 'Silver Strikers',
     city: 'Portland',
     colors: { primary: '#6B7280', secondary: '#10B981' },
-    founded: 1999,
-    coach: 'Patricia Moore'
+    founded: 1999
   },
   {
     name: 'Green Vipers',
     city: 'Austin',
     colors: { primary: '#10B981', secondary: '#1F2937' },
-    founded: 2005,
-    coach: 'Richard Taylor'
+    founded: 2005
   },
   {
     name: 'Purple Panthers',
     city: 'Nashville',
     colors: { primary: '#7C3AED', secondary: '#FBBF24' },
-    founded: 1996,
-    coach: 'Lisa Anderson'
+    founded: 1996
   }
 ];
 
@@ -275,7 +265,86 @@ async function seedDatabase() {
     // Note: We'll create a test user if one doesn't exist, but won't delete existing users
     console.log('Cleared existing data');
     
-    // Create or get test user
+    // Create demo users (no associated data)
+    console.log('\n=== CREATING DEMO USERS ===');
+    const demoUsers = [];
+    
+    // 1. League Manager (Tier 2 - can create 3 leagues)
+    let leagueManager = await User.findOne({ email: 'league.manager@demo.com' });
+    if (!leagueManager) {
+      leagueManager = new User({
+        email: 'league.manager@demo.com',
+        password: 'password123',
+        firstName: 'League',
+        lastName: 'Manager',
+        role: 'user',
+        userType: 'league_admin',
+        tier: 2
+      });
+      await leagueManager.save();
+      console.log('Created demo user: league.manager@demo.com / password123 (League Manager - Tier 2)');
+    } else {
+      // Update existing user if needed
+      if (leagueManager.userType !== 'league_admin' || leagueManager.tier !== 2) {
+        leagueManager.userType = 'league_admin';
+        leagueManager.tier = 2;
+        await leagueManager.save();
+      }
+      console.log('Using existing demo user: league.manager@demo.com');
+    }
+    demoUsers.push(leagueManager);
+    
+    // 2. Team Coach (coach/player type)
+    let teamCoach = await User.findOne({ email: 'team.coach@demo.com' });
+    if (!teamCoach) {
+      teamCoach = new User({
+        email: 'team.coach@demo.com',
+        password: 'password123',
+        firstName: 'Team',
+        lastName: 'Coach',
+        role: 'user',
+        userType: 'coach_player',
+        tier: 1
+      });
+      await teamCoach.save();
+      console.log('Created demo user: team.coach@demo.com / password123 (Team Coach)');
+    } else {
+      // Update existing user if needed
+      if (teamCoach.userType !== 'coach_player') {
+        teamCoach.userType = 'coach_player';
+        teamCoach.tier = 1;
+        await teamCoach.save();
+      }
+      console.log('Using existing demo user: team.coach@demo.com');
+    }
+    demoUsers.push(teamCoach);
+    
+    // 3. Player (coach/player type)
+    let player = await User.findOne({ email: 'player@demo.com' });
+    if (!player) {
+      player = new User({
+        email: 'player@demo.com',
+        password: 'password123',
+        firstName: 'Demo',
+        lastName: 'Player',
+        role: 'user',
+        userType: 'coach_player',
+        tier: 1
+      });
+      await player.save();
+      console.log('Created demo user: player@demo.com / password123 (Player)');
+    } else {
+      // Update existing user if needed
+      if (player.userType !== 'coach_player') {
+        player.userType = 'coach_player';
+        player.tier = 1;
+        await player.save();
+      }
+      console.log('Using existing demo user: player@demo.com');
+    }
+    demoUsers.push(player);
+    
+    // Create or get admin user for seeding data
     let testUser = await User.findOne({ email: 'admin@archsuite.com' });
     if (!testUser) {
       testUser = new User({
@@ -286,13 +355,13 @@ async function seedDatabase() {
         role: 'admin'
       });
       await testUser.save();
-      console.log('Created test user: admin@archsuite.com / password123');
+      console.log('Created admin user: admin@archsuite.com / password123');
     } else {
-      console.log('Using existing test user: admin@archsuite.com');
+      console.log('Using existing admin user: admin@archsuite.com');
     }
     
-    // Create additional random users
-    console.log('\n=== CREATING USERS ===');
+    // Create additional random users for seeding data
+    console.log('\n=== CREATING SEED DATA USERS ===');
     const users = [testUser];
     const userNames = [
       { firstName: 'John', lastName: 'Smith' },
@@ -323,20 +392,29 @@ async function seedDatabase() {
           role: 'user'
         });
         await user.save();
-        console.log(`Created user: ${email} / password123`);
+        console.log(`Created seed user: ${email} / password123`);
       } else {
-        console.log(`Using existing user: ${email}`);
+        console.log(`Using existing seed user: ${email}`);
       }
       users.push(user);
     }
     
     // Create teams
     const teams = [];
-    for (const teamInfo of teamData) {
-      const team = new Team(teamInfo);
+    for (let i = 0; i < teamData.length; i++) {
+      const teamInfo = teamData[i];
+      // Assign a coach from the users array (skip admin user, use regular users)
+      // Use modulo to cycle through users if there are more teams than users
+      const coachIndex = (i % (users.length - 1)) + 1; // +1 to skip admin user
+      const coach = users[coachIndex];
+      
+      const team = new Team({
+        ...teamInfo,
+        coach: coach._id
+      });
       await team.save();
       teams.push(team);
-      console.log(`Created team: ${team.name}`);
+      console.log(`Created team: ${team.name} with coach: ${coach.firstName} ${coach.lastName}`);
     }
     
     // Create players for each team
@@ -493,10 +571,166 @@ async function seedDatabase() {
       await team.save();
     }
     
+    // Create leagues
+    console.log('\n=== CREATING LEAGUES ===');
+    const leagues = [];
+    const leagueData = [
+      {
+        name: 'Premier Soccer League',
+        description: 'The premier soccer league for competitive teams',
+        isPublic: true,
+        owner: testUser._id,
+        members: [testUser._id, ...users.slice(1, 5).map(u => u._id)],
+        settings: { maxTeams: 20, minTeams: 4 }
+      },
+      {
+        name: 'Metro Soccer Association',
+        description: 'Metropolitan area soccer league',
+        isPublic: true,
+        owner: users[1]._id,
+        members: [users[1]._id, ...users.slice(2, 6).map(u => u._id)],
+        settings: { maxTeams: 16, minTeams: 4 }
+      },
+      {
+        name: 'Elite Football Conference',
+        description: 'Elite competitive football conference',
+        isPublic: false,
+        owner: users[2]._id,
+        members: [users[2]._id, ...users.slice(3, 7).map(u => u._id)],
+        settings: { maxTeams: 12, minTeams: 4 }
+      }
+    ];
+    
+    for (const leagueInfo of leagueData) {
+      const league = new League(leagueInfo);
+      await league.save();
+      leagues.push(league);
+      console.log(`Created league: ${league.name}`);
+    }
+    
+    // Create seasons
+    console.log('\n=== CREATING SEASONS ===');
+    const seasons = [];
+    
+    // Create a season for the first league
+    const seasonStartDate = new Date();
+    seasonStartDate.setMonth(seasonStartDate.getMonth() - 2); // 2 months ago
+    const seasonEndDate = new Date();
+    seasonEndDate.setMonth(seasonEndDate.getMonth() + 4); // 4 months from now
+    
+    const season1 = new Season({
+      name: 'Spring 2024',
+      description: 'Spring season 2024',
+      league: leagues[0]._id,
+      startDate: seasonStartDate,
+      endDate: seasonEndDate,
+      teams: teams.slice(0, 6).map(t => t._id), // First 6 teams
+      status: 'active',
+      settings: {
+        gamesPerWeek: 1,
+        playoffTeams: 4,
+        regularSeasonWeeks: 10
+      }
+    });
+    await season1.save();
+    seasons.push(season1);
+    console.log(`Created season: ${season1.name}`);
+    
+    // Create another season for the second league
+    const season2StartDate = new Date();
+    season2StartDate.setMonth(season2StartDate.getMonth() + 1);
+    const season2EndDate = new Date();
+    season2EndDate.setMonth(season2EndDate.getMonth() + 5);
+    
+    const season2 = new Season({
+      name: 'Summer 2024',
+      description: 'Summer season 2024',
+      league: leagues[1]._id,
+      startDate: season2StartDate,
+      endDate: season2EndDate,
+      teams: teams.slice(4, 10).map(t => t._id), // Teams 5-10
+      status: 'registration',
+      settings: {
+        gamesPerWeek: 1,
+        playoffTeams: 4,
+        regularSeasonWeeks: 12
+      }
+    });
+    await season2.save();
+    seasons.push(season2);
+    console.log(`Created season: ${season2.name}`);
+    
+    // Add player registrations with payment status
+    console.log('\n=== CREATING PLAYER REGISTRATIONS ===');
+    
+    // For season 1 (active season) - register players from first 6 teams
+    for (let i = 0; i < 6; i++) {
+      const team = teams[i];
+      const teamPlayers = allPlayers.filter(p => p.team.toString() === team._id.toString());
+      
+      // Register all players from this team
+      for (let j = 0; j < teamPlayers.length; j++) {
+        const player = teamPlayers[j];
+        // 70% of players have paid, 30% haven't
+        const hasPaid = Math.random() > 0.3;
+        const paymentDate = hasPaid 
+          ? getRandomDate(seasonStartDate, new Date())
+          : undefined;
+        
+        season1.playerRegistrations = season1.playerRegistrations || [];
+        season1.playerRegistrations.push({
+          player: player._id,
+          team: team._id,
+          hasPaid: hasPaid,
+          paymentDate: paymentDate,
+          registrationDate: getRandomDate(seasonStartDate, new Date())
+        });
+      }
+    }
+    await season1.save();
+    console.log(`Registered ${season1.playerRegistrations.length} players for ${season1.name}`);
+    
+    // For season 2 (registration season) - register players from teams 5-10
+    for (let i = 4; i < 10; i++) {
+      const team = teams[i];
+      const teamPlayers = allPlayers.filter(p => p.team.toString() === team._id.toString());
+      
+      // Register about 80% of players (some teams still registering)
+      const playersToRegister = Math.floor(teamPlayers.length * 0.8);
+      
+      for (let j = 0; j < playersToRegister; j++) {
+        const player = teamPlayers[j];
+        // 60% of registered players have paid
+        const hasPaid = Math.random() > 0.4;
+        const paymentDate = hasPaid 
+          ? getRandomDate(season2StartDate, new Date())
+          : undefined;
+        
+        season2.playerRegistrations = season2.playerRegistrations || [];
+        season2.playerRegistrations.push({
+          player: player._id,
+          team: team._id,
+          hasPaid: hasPaid,
+          paymentDate: paymentDate,
+          registrationDate: getRandomDate(season2StartDate, new Date())
+        });
+      }
+    }
+    await season2.save();
+    console.log(`Registered ${season2.playerRegistrations.length} players for ${season2.name}`);
+    
+    // Update games to be associated with season 1
+    for (let i = 0; i < Math.min(games.length, 10); i++) {
+      games[i].season = season1._id;
+      await games[i].save();
+    }
+    
     console.log('\nDatabase seeding completed successfully!');
     console.log(`Created ${teams.length} teams`);
     console.log(`Created ${allPlayers.length} players`);
     console.log(`Created ${games.length} games`);
+    console.log(`Created ${leagues.length} leagues`);
+    console.log(`Created ${seasons.length} seasons`);
     
     // Display summary
     console.log('\n=== TEAM STANDINGS ===');
@@ -511,14 +745,31 @@ async function seedDatabase() {
       console.log(`${index + 1}. ${team.name} (${team.city}) - ${points} pts (${team.wins}W-${team.losses}L-${team.ties}T)`);
     });
     
+    // Display player registration summary
+    console.log('\n=== PLAYER REGISTRATION SUMMARY ===');
+    for (const season of seasons) {
+      const paidCount = (season.playerRegistrations || []).filter(r => r.hasPaid).length;
+      const unpaidCount = (season.playerRegistrations || []).filter(r => !r.hasPaid).length;
+      console.log(`${season.name}: ${season.playerRegistrations?.length || 0} registered (${paidCount} paid, ${unpaidCount} unpaid)`);
+    }
+    
     console.log('\n=== SEEDING SUMMARY ===');
     console.log(`Created ${users.length} users`);
     console.log(`Created ${teams.length} teams`);
     console.log(`Created ${allPlayers.length} players`);
     console.log(`Created ${games.length} games`);
-    console.log('\n=== USER CREDENTIALS ===');
-    console.log('All users have password: password123');
-    console.log('Admin: admin@archsuite.com');
+    console.log(`Created ${leagues.length} leagues`);
+    console.log(`Created ${seasons.length} seasons`);
+    console.log('\n=== DEMO USER CREDENTIALS ===');
+    console.log('These users have NO associated data and are for demo purposes:');
+    console.log('Password for all: password123');
+    demoUsers.forEach(user => {
+      console.log(`${user.firstName} ${user.lastName}: ${user.email}`);
+    });
+    
+    console.log('\n=== SEED DATA USER CREDENTIALS ===');
+    console.log('Admin: admin@archsuite.com / password123');
+    console.log('Other seed users: password123');
     users.slice(1).forEach(user => {
       console.log(`${user.firstName} ${user.lastName}: ${user.email}`);
     });

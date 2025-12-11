@@ -34,8 +34,8 @@ const teamSchema = new mongoose.Schema({
     max: new Date().getFullYear()
   },
   coach: {
-    type: String,
-    trim: true
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   captain: {
     type: mongoose.Schema.Types.ObjectId,

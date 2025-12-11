@@ -1,4 +1,15 @@
 // Base interfaces without circular dependencies
+export interface BaseUser {
+  _id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  userType?: 'league_admin' | 'coach_player';
+  tier?: number;
+  leagueLimit?: number;
+}
+
 export interface BaseTeam {
   _id: string;
   name: string;
@@ -9,7 +20,7 @@ export interface BaseTeam {
   };
   logo?: string;
   founded?: number;
-  coach?: string;
+  coach?: BaseUser | string;
   wins: number;
   losses: number;
   ties: number;
@@ -176,6 +187,16 @@ export interface CreateGameData {
 }
 
 // Season interfaces
+export interface PlayerRegistration {
+  _id?: string;
+  player: BasePlayer | string;
+  team: BaseTeam | string;
+  hasPaid: boolean;
+  paymentDate?: string;
+  registrationDate: string;
+  notes?: string;
+}
+
 export interface BaseSeason {
   _id: string;
   name: string;
@@ -191,6 +212,7 @@ export interface BaseSeason {
     regularSeasonWeeks: number;
   };
   standings: SeasonStanding[];
+  playerRegistrations?: PlayerRegistration[];
   totalWeeks: number;
   completedWeeks: number;
   progressPercentage: number;
